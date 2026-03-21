@@ -1,5 +1,18 @@
 import type { Metadata } from "next";
+import { Outfit, Space_Mono } from "next/font/google";
 import "./globals.css";
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+  weight: ["300", "400", "500", "600", "700", "800"],
+});
+
+const spaceMono = Space_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  weight: ["400", "700"],
+});
 
 export const metadata: Metadata = {
   title: "The Darkroom",
@@ -28,8 +41,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="bg-[#050508] text-white antialiased">
+    <html lang="en" className={`${outfit.variable} ${spaceMono.variable}`}>
+      <body className="bg-[#050508] text-white antialiased font-(family-name:--font-outfit)">
         {children}
       </body>
     </html>
