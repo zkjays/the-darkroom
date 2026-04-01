@@ -5,13 +5,14 @@ export interface DarkroomResult {
   archetype: string;
   tagline: string;
   stats: {
-    builder: number;
-    privacy: number;
-    crypto: number;
-    community: number;
+    dedication: number;
+    consistency: number;
+    stealth: number;
+    momentum: number;
   };
   analysis: string;
   darkroom_line: string;
+  profile_image_url?: string;
   isFallback?: boolean;
   warnings?: string[];
 }
@@ -40,42 +41,25 @@ function getFallbackResult(
   warnings: string[] = []
 ): DarkroomResult {
   const q1Score =
-    q1 === "Ship fast, fix later"
-      ? 25
-      : q1 === "Late nights, no announcements"
-      ? 22
-      : q1 === "Plan everything, then execute"
-      ? 20
-      : 10;
+    q1 === "6plus" ? 30 : q1 === "3to5" ? 22 : q1 === "1to2" ? 14 : 6;
 
   const q2Score =
-    q2 === "Close the tab instantly"
-      ? 25
-      : q2 === "Only if it's zero-knowledge"
-      ? 20
-      : q2 === "Depends on the upside"
-      ? 12
-      : 5;
+    q2 === "daily" ? 28 : q2 === "rhythm" ? 20 : q2 === "waves" ? 12 : 5;
 
   const q3Score =
-    q3 === "Privacy wallets, own nodes, self-sovereign"
-      ? 25
-      : q3 === "DeFi, swaps, onchain daily"
-      ? 18
-      : q3 === "Hold and check prices sometimes"
-      ? 10
-      : 5;
+    q3 === "silence" ? 20 : q3 === "document" ? 16 : q3 === "public" ? 14 : 8;
 
   const handleBonus =
-    /zk|anon|proof|dev|build|0x|eth|btc|hack/i.test(handle) ? 8 : 0;
+    /build|dev|ship|hack|code/i.test(handle) ? 8 : 0;
 
-  const score = Math.min(98, q1Score + q2Score + q3Score + handleBonus);
+  const rawScore = q1Score + q2Score + q3Score + handleBonus;
+  const score = Math.min(98, Math.max(40, rawScore));
   const archetype = getArchetype(score);
 
-  const builderStat = Math.min(98, q1Score * 3 + 20);
-  const privacyStat = Math.min(98, q2Score * 3 + 20);
-  const cryptoStat = Math.min(98, q3Score * 3 + 20);
-  const communityStat = Math.min(98, Math.max(20, handleBonus * 5 + 30));
+  const dedicationStat = Math.min(98, q1Score * 3 + 8);
+  const consistencyStat = Math.min(98, q2Score * 3 + 8);
+  const stealthStat = Math.min(98, q3Score === 20 ? 85 : q3Score === 16 ? 55 : q3Score === 14 ? 30 : 50);
+  const momentumStat = Math.min(98, Math.max(20, Math.round((dedicationStat + consistencyStat) / 2) + handleBonus));
 
   const taglines: Record<string, string> = {
     "Ghost Builder": "ships in the dark, drops in the light",
@@ -106,10 +90,10 @@ function getFallbackResult(
     archetype,
     tagline: taglines[archetype] ?? "built different",
     stats: {
-      builder: builderStat,
-      privacy: privacyStat,
-      crypto: cryptoStat,
-      community: communityStat,
+      dedication: dedicationStat,
+      consistency: consistencyStat,
+      stealth: stealthStat,
+      momentum: momentumStat,
     },
     analysis: `@${handle} — the quiz answers tell a story. You're building with intention, keeping your cards close, and the profile checks out. The darkroom recognizes the pattern.`,
     darkroom_line: lines[archetype] ?? "Welcome to the darkroom.",
@@ -119,6 +103,7 @@ function getFallbackResult(
 }
 
 export async function POST(req: NextRequest) {
+  console.log("API ROUTE HIT", new Date().toISOString());
   const { handle, q1, q2, q3 } = await req.json();
 
   if (!handle || !q1 || !q2 || !q3) {
@@ -136,6 +121,7 @@ export async function POST(req: NextRequest) {
   let tweetCount = 0;
   let recentTweets: string[] = [];
   let userId = "";
+  let profileImageUrl = "";
 
   if (bearerToken) {
     console.log("Step 1: Fetching X profile for", handle);
@@ -161,17 +147,25 @@ export async function POST(req: NextRequest) {
           followersCount = user.public_metrics?.followers_count ?? 0;
           followingCount = user.public_metrics?.following_count ?? 0;
           tweetCount = user.public_metrics?.tweet_count ?? 0;
+          profileImageUrl = (user.profile_image_url ?? "").replace("_normal", "_400x400");
+        } else {
+          console.log("Step 1: profile response ok but data is empty:", JSON.stringify(profileData));
         }
       } else {
+        const errorBody = await profileRes.text().catch(() => "(unreadable)");
+        console.log("Step 1: profile fetch failed —", profileRes.status, errorBody);
         warnings.push(`x_api_failed: Could not fetch X profile (${profileRes.status})`);
       }
+      console.log("Step 1 result:", JSON.stringify({ userId, bio, followers: followersCount, profileImageUrl }));
     } catch (e) {
       clearTimeout(profileTimeout);
-      warnings.push(`x_api_failed: ${e instanceof Error && e.name === "AbortError" ? "X profile request timed out" : "Could not fetch X profile"}`);
+      const reason = e instanceof Error && e.name === "AbortError" ? "X profile request timed out" : "Could not fetch X profile";
+      console.log("Step 1: exception —", reason, e);
+      warnings.push(`x_api_failed: ${reason}`);
     }
 
     if (userId) {
-      console.log("Step 2: Fetching tweets for user", userId);
+      console.log("Step 2: Fetching tweets for userId", userId);
       const tweetsController = new AbortController();
       const tweetsTimeout = setTimeout(() => tweetsController.abort(), 10000);
       try {
@@ -190,13 +184,20 @@ export async function POST(req: NextRequest) {
           recentTweets = (tweetsData.data ?? []).map(
             (t: { text: string }) => t.text
           );
+          console.log("Step 2 result: got", recentTweets.length, "tweets");
         } else {
+          const errorBody = await tweetsRes.text().catch(() => "(unreadable)");
+          console.log("Step 2: tweets fetch failed —", tweetsRes.status, errorBody);
           warnings.push(`x_tweets_failed: Could not fetch recent tweets (${tweetsRes.status})`);
         }
       } catch (e) {
         clearTimeout(tweetsTimeout);
-        warnings.push(`x_tweets_failed: ${e instanceof Error && e.name === "AbortError" ? "Tweets request timed out" : "Could not fetch recent tweets"}`);
+        const reason = e instanceof Error && e.name === "AbortError" ? "Tweets request timed out" : "Could not fetch recent tweets";
+        console.log("Step 2: exception —", reason, e);
+        warnings.push(`x_tweets_failed: ${reason}`);
       }
+    } else {
+      console.log("Step 2: skipped — userId is empty (Step 1 likely failed)");
     }
   } else {
     warnings.push("x_api_failed: No bearer token configured");
@@ -206,10 +207,11 @@ export async function POST(req: NextRequest) {
   if (!anthropicKey) {
     console.log("Fallback: using deterministic scoring (no API key)");
     warnings.push("claude_api_failed: No API key configured, using fallback scoring");
-    return NextResponse.json(getFallbackResult(handle, q1, q2, q3, warnings));
+    return NextResponse.json({ ...getFallbackResult(handle, q1, q2, q3, warnings), profile_image_url: profileImageUrl || undefined });
   }
 
   console.log("Step 3: Calling Claude API");
+  console.log("Sending to Claude:", JSON.stringify({ handle, q1, q2, q3, bio, followers: followersCount, tweetCount: recentTweets.length }));
 
   const userMessage = `
 Handle: @${handle}
@@ -217,9 +219,9 @@ Bio: ${bio || "(not available)"}
 Followers: ${followersCount} | Following: ${followingCount} | Tweets: ${tweetCount}
 
 Quiz answers:
-- How do you build? → "${q1}"
-- A project asks for your identity. You... → "${q2}"
-- How do you interact with crypto? → "${q3}"
+- How many hours a day do you spend building or learning? → "${q1}"
+- How consistent are you? → "${q2}"
+- What's your relationship with sharing your work? → "${q3}"
 
 Recent tweets (last 10):
 ${recentTweets.length > 0 ? recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\n") : "(not available)"}
@@ -240,26 +242,30 @@ ${recentTweets.length > 0 ? recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\
         max_tokens: 1024,
         system: `You are The Darkroom ID generator. Analyze the user's X profile and quiz answers to create a builder personality profile.
 
+The quiz measures real builder habits:
+- Q1: Daily time investment (6plus=max dedication, notenough=starting)
+- Q2: Consistency (daily=iron discipline, motivation=sporadic)
+- Q3: Sharing style (silence=stealth builder, public=open builder, absorbing=learner)
+
 ARCHETYPES (pick ONE based on score):
 High tier (75-98): 'Silent Architect' (the blueprint speaks for itself), 'Ghost Builder' (ships in the dark, drops in the light), 'Shadow Operator' (you won't see me, but you'll see my work)
 Mid tier (50-74): 'Half Built' (foundation solid, still stacking floors), 'Curious Lurker' (reads everything, ships soon), 'Almost Based' (one commit away from greatness)
 Low tier (40-49): 'Main Character Loading' (the arc hasn't even started), 'Fresh Compile' (first build, first bugs, first glory), 'NPC (for now)' (everyone's origin story starts somewhere)
 
+STATS to generate (each 20-98):
+- dedication: how much time they invest daily
+- consistency: how regular they are
+- stealth: how much they build in silence vs public (high = silent, low = public sharer)
+- momentum: overall energy combining all signals + X profile activity
+
 SCORING GUIDE:
-- Builder mindset: 'ship fast' or 'late nights' = high builder, 'watching' = low
-- Privacy: 'close tab' or 'zero-knowledge' = high privacy, 'no problem' = low
-- Crypto: 'privacy wallets/self-sovereign' = highest, 'still figuring out' = lowest
-- X profile: bio with builder/dev/founder keywords = boost. Active tweeter = community boost. Handle with zk/anon/proof = privacy boost.
+- 6plus hours + daily + silence = highest scores (Silent Architect / Ghost Builder)
+- 3to5 + rhythm + document = solid mid tier
+- notenough + motivation + absorbing = lower tier but always encouraging
+- X profile boosts: active tweeter = momentum boost, bio with build/ship/dev = dedication boost, high follower ratio = influence
 
 Respond ONLY with JSON (no markdown, no backticks):
-{
-  "score": <number 40-98>,
-  "archetype": "<exact name from list above>",
-  "tagline": "<max 8 words, fun, builder-native>",
-  "stats": { "builder": <20-98>, "privacy": <20-98>, "crypto": <20-98>, "community": <20-98> },
-  "analysis": "<3 sentences max. Fun, witty, reference their actual handle and bio. Never mean, always encouraging.>",
-  "darkroom_line": "<one Darkroom themed line based on tier>"
-}`,
+{"score": <40-98>, "archetype": "<exact name from list>", "tagline": "<max 8 words. Must reference something specific from their X bio or tweets. Be witty, fun, builder-focused. Example: if bio says 'building in web3' → 'building so hard web3 felt it'. If bio says 'designer' → 'pixels by day, commits by night'. Never generic, always personal.>", "stats": {"dedication": <20-98>, "consistency": <20-98>, "stealth": <20-98>, "momentum": <20-98>}, "analysis": "<3 sentences. Fun, reference their handle and actual habits. Never mean, always encouraging.>", "darkroom_line": "<one Darkroom themed line>"}`,
         messages: [{ role: "user", content: userMessage }],
       }),
       signal: claudeController.signal,
@@ -269,13 +275,14 @@ Respond ONLY with JSON (no markdown, no backticks):
     if (!claudeRes.ok) {
       console.log("Fallback: using deterministic scoring (Claude returned", claudeRes.status, ")");
       warnings.push(`claude_api_failed: AI generation failed (${claudeRes.status}), using fallback scoring`);
-      return NextResponse.json(getFallbackResult(handle, q1, q2, q3, warnings));
+      return NextResponse.json({ ...getFallbackResult(handle, q1, q2, q3, warnings), profile_image_url: profileImageUrl || undefined });
     }
 
     const claudeData = await claudeRes.json();
     const raw = claudeData.content?.[0]?.text ?? "";
     const result: DarkroomResult = JSON.parse(raw);
     result.warnings = warnings.length > 0 ? warnings : undefined;
+    result.profile_image_url = profileImageUrl || undefined;
     return NextResponse.json(result);
   } catch (e) {
     clearTimeout(claudeTimeout);
@@ -284,6 +291,6 @@ Respond ONLY with JSON (no markdown, no backticks):
       : e instanceof Error ? e.message : "AI generation failed";
     console.log("Fallback: using deterministic scoring —", reason);
     warnings.push(`claude_api_failed: ${reason}, using fallback scoring`);
-    return NextResponse.json(getFallbackResult(handle, q1, q2, q3, warnings));
+    return NextResponse.json({ ...getFallbackResult(handle, q1, q2, q3, warnings), profile_image_url: profileImageUrl || undefined });
   }
 }

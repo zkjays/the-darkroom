@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import Navbar from "../component/landing/Navbar";
+import CardGenerator from "../component/darkroom-id/CardGenerator";
 import type { DarkroomResult } from "../api/generate/route";
 
 type Answers = {
@@ -15,34 +16,34 @@ const questions = [
   {
     key: "q1" as keyof Answers,
     label: "01 / 03",
-    title: "How do you build?",
+    title: "How many hours a day do you spend building or learning?",
     options: [
-      { emoji: "🔨", text: "Ship fast, fix later" },
-      { emoji: "🧱", text: "Plan everything, then execute" },
-      { emoji: "🌙", text: "Late nights, no announcements" },
-      { emoji: "👀", text: "Still learning, watching for now" },
+      { emoji: "🔥", text: "6+ hours — it's not a hobby, it's the mission", value: "6plus" },
+      { emoji: "⚡", text: "3-5 hours — consistent, focused blocks", value: "3to5" },
+      { emoji: "🌱", text: "1-2 hours — fitting it in around life", value: "1to2" },
+      { emoji: "💤", text: "Honestly? Not enough yet", value: "notenough" },
     ],
   },
   {
     key: "q2" as keyof Answers,
     label: "02 / 03",
-    title: "A project asks for your identity. You...",
+    title: "How consistent are you?",
     options: [
-      { emoji: "🔥", text: "Close the tab instantly" },
-      { emoji: "🔐", text: "Only if it's zero-knowledge" },
-      { emoji: "🤷", text: "Depends on the upside" },
-      { emoji: "✅", text: "No problem if legit" },
+      { emoji: "🗓️", text: "Every single day, no exceptions", value: "daily" },
+      { emoji: "📈", text: "Most days — I have a rhythm", value: "rhythm" },
+      { emoji: "🌊", text: "In waves — intense bursts then breaks", value: "waves" },
+      { emoji: "🎲", text: "When motivation hits", value: "motivation" },
     ],
   },
   {
     key: "q3" as keyof Answers,
     label: "03 / 03",
-    title: "How do you interact with crypto?",
+    title: "What's your relationship with sharing your work?",
     options: [
-      { emoji: "🛡️", text: "Privacy wallets, own nodes, self-sovereign" },
-      { emoji: "⚡", text: "DeFi, swaps, onchain daily" },
-      { emoji: "📱", text: "Hold and check prices sometimes" },
-      { emoji: "🤔", text: "Still figuring it out" },
+      { emoji: "🔇", text: "I build in silence — results speak", value: "silence" },
+      { emoji: "📝", text: "I document the journey as I go", value: "document" },
+      { emoji: "📢", text: "I share everything — building in public", value: "public" },
+      { emoji: "👀", text: "Nothing to share yet — still absorbing", value: "absorbing" },
     ],
   },
 ];
@@ -56,10 +57,10 @@ const LOADING_STEPS = [
 ];
 
 const statColors: Record<string, string> = {
-  builder: "bg-blue-400",
-  privacy: "bg-purple-400",
-  crypto: "bg-emerald-400",
-  community: "bg-amber-400",
+  dedication: "bg-blue-400",
+  consistency: "bg-purple-400",
+  stealth: "bg-emerald-400",
+  momentum: "bg-amber-400",
 };
 
 function StatBar({
@@ -74,14 +75,14 @@ function StatBar({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex justify-between items-center">
-        <span className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.2em] text-white/40 uppercase">
+        <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 uppercase">
           {label}
         </span>
-        <span className="font-[family-name:var(--font-mono)] text-xs text-white/50">
+        <span className="font-mono text-xs text-white/50">
           {value}
         </span>
       </div>
-      <div className="h-[3px] w-full rounded-full bg-white/10 overflow-hidden">
+      <div className="h-0.75 w-full rounded-full bg-white/10 overflow-hidden">
         <div
           className={`h-full rounded-full ${color} transition-all duration-700 ease-out`}
           style={{ width: `${value}%` }}
@@ -122,7 +123,7 @@ function LoadingStepRow({
 
   return (
     <div className="flex items-center gap-3">
-      <div className="w-4 flex-shrink-0 flex items-center justify-center">
+      <div className="w-4 shrink-0 flex items-center justify-center">
         {icon}
       </div>
       <span
@@ -160,12 +161,18 @@ export default function DarkroomID() {
   };
 
   const handleOptionSelect = (key: keyof Answers, value: string) => {
-    setAnswers((prev) => ({ ...prev, [key]: value }));
+    const updatedAnswers = { ...answers, [key]: value };
+    setAnswers(updatedAnswers);
     if (!pendingAdvance) {
       setPendingAdvance(true);
       setTimeout(() => {
         setPendingAdvance(false);
-        goTo(step + 1);
+        if (step === 3) {
+          goTo(4);
+          submitQuiz(updatedAnswers);
+        } else {
+          goTo(step + 1);
+        }
       }, 400);
     }
   };
@@ -197,6 +204,7 @@ export default function DarkroomID() {
     timersRef.current.push(safetyTimer);
 
     try {
+      console.log("CLIENT: calling /api/generate with", finalAnswers);
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -216,6 +224,7 @@ export default function DarkroomID() {
       await new Promise((r) => setTimeout(r, 700));
       setResult(data);
     } catch (e) {
+      console.error("CLIENT: fetch error", e);
       clearTimers();
       // Don't overwrite the safety timeout message if it already fired
       if (!loadError) {
@@ -260,9 +269,6 @@ export default function DarkroomID() {
   const currentAnswer = currentQuestion ? answers[currentQuestion.key] : "";
   const progressWidth = `${(step / 4) * 100}%`;
 
-  const shareText = result
-    ? `I just got my Darkroom ID: "${result.archetype}" — score ${result.score}/98.\n\n${result.tagline}\n\nGet yours 👇\nthedarkroom.xyz/darkroom-id`
-    : "";
 
   return (
     <div className="min-h-screen bg-[#050508] text-white font-[family-name:var(--font-outfit)]">
@@ -339,12 +345,12 @@ export default function DarkroomID() {
 
               <div className="flex flex-col gap-3 mb-8">
                 {currentQuestion.options.map((option) => {
-                  const selected = currentAnswer === option.text;
+                  const selected = currentAnswer === option.value;
                   return (
                     <button
-                      key={option.text}
+                      key={option.value}
                       onClick={() =>
-                        handleOptionSelect(currentQuestion.key, option.text)
+                        handleOptionSelect(currentQuestion.key, option.value)
                       }
                       className={`group flex items-center gap-4 rounded-xl p-4 border text-left transition-all duration-200 cursor-pointer ${
                         selected
@@ -481,23 +487,24 @@ export default function DarkroomID() {
                     {result.darkroom_line}
                   </p>
 
-                  {/* Actions */}
-                  <div className="flex gap-3 pt-2">
-                    <a
-                      href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 text-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)]"
-                    >
-                      Share on X →
-                    </a>
-                    <button
-                      onClick={startOver}
-                      className="rounded-xl border border-white/10 px-5 py-3 text-sm text-white/50 hover:text-white/80 hover:border-white/20 transition-all"
-                    >
-                      Try again
-                    </button>
-                  </div>
+                  {/* Card + share actions */}
+                  <CardGenerator
+                    handle={answers.handle}
+                    score={result.score}
+                    archetype={result.archetype}
+                    tagline={result.tagline}
+                    stats={result.stats}
+                    analysis={result.analysis}
+                    darkroomLine={result.darkroom_line}
+                    profileImageUrl={result.profile_image_url}
+                  />
+
+                  <button
+                    onClick={startOver}
+                    className="rounded-xl border border-white/10 px-5 py-3 text-sm text-white/50 hover:text-white/80 hover:border-white/20 transition-all"
+                  >
+                    Try again
+                  </button>
                 </div>
               )}
             </div>

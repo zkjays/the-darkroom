@@ -12,7 +12,7 @@ export default function PhaseTeaser() {
           {items.map((item) => (
             <div
               key={item}
-              className="rounded-2xl border border-white/5 bg-white/[0.02] px-6 py-5 text-sm text-white/55 transition hover:border-white/10 hover:bg-white/[0.04] hover:text-white/80"
+              className="rounded-2xl border border-white/5 bg-white/2 px-6 py-5 text-sm text-white/55 transition hover:border-white/10 hover:bg-white/4 hover:text-white/80"
             >
               {item}
             </div>
