@@ -18,18 +18,18 @@ export interface DarkroomResult {
 }
 
 function getArchetype(score: number): string {
-  if (score >= 75) {
-    if (score >= 88) return "Ghost Builder";
-    if (score >= 82) return "Silent Architect";
+  if (score >= 60) {
+    if (score >= 72) return "Ghost Builder";
+    if (score >= 66) return "Silent Architect";
     return "Shadow Operator";
   }
-  if (score >= 50) {
-    if (score >= 68) return "Half Built";
-    if (score >= 58) return "Curious Lurker";
+  if (score >= 45) {
+    if (score >= 55) return "Half Built";
+    if (score >= 50) return "Curious Lurker";
     return "Almost Based";
   }
-  if (score >= 45) return "Main Character Loading";
-  if (score >= 42) return "Fresh Compile";
+  if (score >= 40) return "Main Character Loading";
+  if (score >= 35) return "Fresh Compile";
   return "NPC (for now)";
 }
 
@@ -41,25 +41,25 @@ function getFallbackResult(
   warnings: string[] = []
 ): DarkroomResult {
   const q1Score =
-    q1 === "6plus" ? 30 : q1 === "3to5" ? 22 : q1 === "1to2" ? 14 : 6;
+    q1 === "6plus" ? 26 : q1 === "3to5" ? 19 : q1 === "1to2" ? 12 : 5;
 
   const q2Score =
-    q2 === "daily" ? 28 : q2 === "rhythm" ? 20 : q2 === "waves" ? 12 : 5;
+    q2 === "daily" ? 24 : q2 === "rhythm" ? 17 : q2 === "waves" ? 11 : 4;
 
   const q3Score =
-    q3 === "silence" ? 20 : q3 === "document" ? 16 : q3 === "public" ? 14 : 8;
+    q3 === "silence" ? 18 : q3 === "document" ? 14 : q3 === "public" ? 11 : 6;
 
   const handleBonus =
-    /build|dev|ship|hack|code/i.test(handle) ? 8 : 0;
+    /build|dev|ship|hack|code/i.test(handle) ? 7 : 0;
 
   const rawScore = q1Score + q2Score + q3Score + handleBonus;
-  const score = Math.min(98, Math.max(40, rawScore));
+  const score = Math.min(75, Math.max(30, rawScore));
   const archetype = getArchetype(score);
 
-  const dedicationStat = Math.min(98, q1Score * 3 + 8);
-  const consistencyStat = Math.min(98, q2Score * 3 + 8);
-  const stealthStat = Math.min(98, q3Score === 20 ? 85 : q3Score === 16 ? 55 : q3Score === 14 ? 30 : 50);
-  const momentumStat = Math.min(98, Math.max(20, Math.round((dedicationStat + consistencyStat) / 2) + handleBonus));
+  const dedicationStat = Math.min(75, Math.max(15, Math.round(q1Score / 26 * 75)));
+  const consistencyStat = Math.min(75, Math.max(15, Math.round(q2Score / 24 * 75)));
+  const stealthStat = Math.min(75, q3Score === 18 ? 70 : q3Score === 14 ? 50 : q3Score === 11 ? 28 : 42);
+  const momentumStat = Math.min(75, Math.max(15, Math.round((dedicationStat + consistencyStat) / 2) + handleBonus));
 
   const taglines: Record<string, string> = {
     "Ghost Builder": "ships in the dark, drops in the light",
@@ -248,11 +248,11 @@ The quiz measures real builder habits:
 - Q3: Sharing style (silence=stealth builder, public=open builder, absorbing=learner)
 
 ARCHETYPES (pick ONE based on score):
-High tier (75-98): 'Silent Architect' (the blueprint speaks for itself), 'Ghost Builder' (ships in the dark, drops in the light), 'Shadow Operator' (you won't see me, but you'll see my work)
-Mid tier (50-74): 'Half Built' (foundation solid, still stacking floors), 'Curious Lurker' (reads everything, ships soon), 'Almost Based' (one commit away from greatness)
-Low tier (40-49): 'Main Character Loading' (the arc hasn't even started), 'Fresh Compile' (first build, first bugs, first glory), 'NPC (for now)' (everyone's origin story starts somewhere)
+High tier (60-75): 'Silent Architect' (the blueprint speaks for itself), 'Ghost Builder' (ships in the dark, drops in the light), 'Shadow Operator' (you won't see me, but you'll see my work)
+Mid tier (45-59): 'Half Built' (foundation solid, still stacking floors), 'Curious Lurker' (reads everything, ships soon), 'Almost Based' (one commit away from greatness)
+Low tier (30-44): 'Main Character Loading' (the arc hasn't even started), 'Fresh Compile' (first build, first bugs, first glory), 'NPC (for now)' (everyone's origin story starts somewhere)
 
-STATS to generate (each 20-98):
+STATS to generate (each 15-75). Scores are out of 75 — Phase 2 lessons and certifications add up to +25 bonus points:
 - dedication: how much time they invest daily
 - consistency: how regular they are
 - stealth: how much they build in silence vs public (high = silent, low = public sharer)
@@ -265,7 +265,7 @@ SCORING GUIDE:
 - X profile boosts: active tweeter = momentum boost, bio with build/ship/dev = dedication boost, high follower ratio = influence
 
 Respond ONLY with JSON (no markdown, no backticks):
-{"score": <40-98>, "archetype": "<exact name from list>", "tagline": "<max 8 words. Builder-focused. Reference something specific from their X bio or tweets. About their work ethic, building habits, or craft. NEVER mention privacy, ZK, proof, or crypto. Examples: 'building so hard sleep forgot you', 'commits speak louder than tweets', 'shipping while they sleep'. Must be personal and witty.>", "stats": {"dedication": <20-98>, "consistency": <20-98>, "stealth": <20-98>, "momentum": <20-98>}, "analysis": "<3 sentences. Fun, reference their handle and actual habits. Never mean, always encouraging.>", "darkroom_line": "<One Darkroom themed line about building. NEVER mention privacy or ZK. Focus on builder mindset, shipping, grinding, focus. Examples: 'The Darkroom is where the real work happens.', 'In The Darkroom, your commits echo forever.'>"}`,
+{"score": <30-75>, "archetype": "<exact name from list>", "tagline": "<max 8 words. Builder-focused. Reference something specific from their X bio or tweets. About their work ethic, building habits, or craft. NEVER mention privacy, ZK, proof, or crypto. Examples: 'building so hard sleep forgot you', 'commits speak louder than tweets', 'shipping while they sleep'. Must be personal and witty.>", "stats": {"dedication": <15-75>, "consistency": <15-75>, "stealth": <15-75>, "momentum": <15-75>}, "analysis": "<3 sentences. Fun, reference their handle and actual habits. Never mean, always encouraging.>", "darkroom_line": "<One Darkroom themed line about building. NEVER mention privacy or ZK. Focus on builder mindset, shipping, grinding, focus. Examples: 'The Darkroom is where the real work happens.', 'In The Darkroom, your commits echo forever.'>"}`,
         messages: [{ role: "user", content: userMessage }],
       }),
       signal: claudeController.signal,
