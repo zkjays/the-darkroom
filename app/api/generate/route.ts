@@ -265,7 +265,7 @@ SCORING GUIDE:
 - X profile boosts: active tweeter = momentum boost, bio with build/ship/dev = dedication boost, high follower ratio = influence
 
 Respond ONLY with JSON (no markdown, no backticks):
-{"score": <40-98>, "archetype": "<exact name from list>", "tagline": "<max 8 words. Must reference something specific from their X bio or tweets. Be witty, fun, builder-focused. Example: if bio says 'building in web3' → 'building so hard web3 felt it'. If bio says 'designer' → 'pixels by day, commits by night'. Never generic, always personal.>", "stats": {"dedication": <20-98>, "consistency": <20-98>, "stealth": <20-98>, "momentum": <20-98>}, "analysis": "<3 sentences. Fun, reference their handle and actual habits. Never mean, always encouraging.>", "darkroom_line": "<one Darkroom themed line>"}`,
+{"score": <40-98>, "archetype": "<exact name from list>", "tagline": "<max 8 words. Builder-focused. Reference something specific from their X bio or tweets. About their work ethic, building habits, or craft. NEVER mention privacy, ZK, proof, or crypto. Examples: 'building so hard sleep forgot you', 'commits speak louder than tweets', 'shipping while they sleep'. Must be personal and witty.>", "stats": {"dedication": <20-98>, "consistency": <20-98>, "stealth": <20-98>, "momentum": <20-98>}, "analysis": "<3 sentences. Fun, reference their handle and actual habits. Never mean, always encouraging.>", "darkroom_line": "<One Darkroom themed line about building. NEVER mention privacy or ZK. Focus on builder mindset, shipping, grinding, focus. Examples: 'The Darkroom is where the real work happens.', 'In The Darkroom, your commits echo forever.'>"}`,
         messages: [{ role: "user", content: userMessage }],
       }),
       signal: claudeController.signal,
