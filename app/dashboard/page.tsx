@@ -19,7 +19,7 @@ interface DashboardData {
   total_score?: number;
   archetype: string;
   tagline: string;
-  stats: { dedication: number; consistency: number; stealth: number; momentum: number };
+  stats: { focus: number; consistency: number; reliability: number; growth: number };
   analysis: string;
   darkroom_line: string;
   profile_image_url?: string;
@@ -34,32 +34,32 @@ const statConfig: Record<
   string,
   { color: string; improvements: Array<{ label: string; points: string }> }
 > = {
-  dedication: {
+  focus: {
     color: "bg-blue-400",
     improvements: [
-      { label: "Complete 'Builder Basics' lesson", points: "+5 pts" },
-      { label: "Earn 'Dedicated Builder' certification", points: "+15 pts" },
+      { label: "Complete deep-dive lessons", points: "+5 pts" },
+      { label: "Earn Specialist certification", points: "+15 pts" },
     ],
   },
   consistency: {
     color: "bg-purple-400",
     improvements: [
-      { label: "Maintain a 7-day streak", points: "+8 pts" },
-      { label: "Log in 30 days in a row", points: "+12 pts" },
+      { label: "Maintain a 7-day streak", points: "+3 pts" },
+      { label: "30 days in a row", points: "+10 pts" },
     ],
   },
-  stealth: {
+  reliability: {
     color: "bg-emerald-400",
     improvements: [
-      { label: "Complete stealth challenges", points: "+6 pts" },
-      { label: "Build a private project log", points: "+10 pts" },
+      { label: "Complete Builder Basics course", points: "+5 pts" },
+      { label: "Earn Trusted Builder badge", points: "+15 pts" },
     ],
   },
-  momentum: {
+  growth: {
     color: "bg-amber-400",
     improvements: [
-      { label: "Share your progress publicly", points: "+5 pts" },
-      { label: "Earn community badges", points: "+10 pts" },
+      { label: "Share your journey publicly", points: "+3 pts" },
+      { label: "Help 3 builders this week", points: "+5 pts" },
     ],
   },
 };

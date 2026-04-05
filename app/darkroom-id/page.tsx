@@ -1,91 +1,51 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "../component/landing/Navbar";
 import CardGenerator from "../component/darkroom-id/CardGenerator";
 import type { DarkroomResult } from "../api/generate/route";
 
 type Answers = {
   handle: string;
-  q1: string;
-  q2: string;
-  q3: string;
+  goals: string[];
 };
 
-const questions = [
-  {
-    key: "q1" as keyof Answers,
-    label: "01 / 03",
-    title: "How many hours a day do you spend building or learning?",
-    options: [
-      { emoji: "🔥", text: "6+ hours — it's not a hobby, it's the mission", value: "6plus" },
-      { emoji: "⚡", text: "3-5 hours — consistent, focused blocks", value: "3to5" },
-      { emoji: "🌱", text: "1-2 hours — fitting it in around life", value: "1to2" },
-      { emoji: "💤", text: "Honestly? Not enough yet", value: "notenough" },
-    ],
-  },
-  {
-    key: "q2" as keyof Answers,
-    label: "02 / 03",
-    title: "How consistent are you?",
-    options: [
-      { emoji: "🗓️", text: "Every single day, no exceptions", value: "daily" },
-      { emoji: "📈", text: "Most days — I have a rhythm", value: "rhythm" },
-      { emoji: "🌊", text: "In waves — intense bursts then breaks", value: "waves" },
-      { emoji: "🎲", text: "When motivation hits", value: "motivation" },
-    ],
-  },
-  {
-    key: "q3" as keyof Answers,
-    label: "03 / 03",
-    title: "What's your relationship with sharing your work?",
-    options: [
-      { emoji: "🔇", text: "I build in silence — results speak", value: "silence" },
-      { emoji: "📝", text: "I document the journey as I go", value: "document" },
-      { emoji: "📢", text: "I share everything — building in public", value: "public" },
-      { emoji: "👀", text: "Nothing to share yet — still absorbing", value: "absorbing" },
-    ],
-  },
+const GOAL_OPTIONS = [
+  { emoji: "🎯", text: "My personal brand",    value: "brand" },
+  { emoji: "🧠", text: "My skills",            value: "skills" },
+  { emoji: "🛠️", text: "A project",            value: "project" },
+  { emoji: "🌍", text: "A community",          value: "community" },
+  { emoji: "💰", text: "My financial freedom", value: "freedom" },
+  { emoji: "🔍", text: "Still figuring it out", value: "exploring" },
 ];
 
 const LOADING_STEPS = [
   "Fetching X profile...",
   "Analyzing recent tweets...",
-  "Processing quiz answers...",
+  "Processing your goals...",
   "Generating your Darkroom ID...",
   "Finalizing...",
 ];
 
 const statColors: Record<string, string> = {
-  dedication: "bg-blue-400",
+  focus:       "bg-blue-400",
   consistency: "bg-purple-400",
-  stealth: "bg-emerald-400",
-  momentum: "bg-amber-400",
+  reliability: "bg-emerald-400",
+  growth:      "bg-amber-400",
 };
 
-function StatBar({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number;
-  color: string;
-}) {
+function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex justify-between items-center">
-        <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 uppercase">
-          {label}
-        </span>
-        <span className="font-mono text-xs text-white/50">
-          {value}
-        </span>
+        <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 uppercase">{label}</span>
+        <span className="font-mono text-xs text-white/50">{value}</span>
       </div>
       <div className="h-0.75 w-full rounded-full bg-white/10 overflow-hidden">
         <div
           className={`h-full rounded-full ${color} transition-all duration-700 ease-out`}
-          style={{ width: `${value}%` }}
+          style={{ width: `${(value / 75) * 100}%` }}
         />
       </div>
     </div>
@@ -94,41 +54,23 @@ function StatBar({
 
 type StepStatus = "waiting" | "active" | "done" | "error";
 
-function LoadingStepRow({
-  label,
-  status,
-}: {
-  label: string;
-  status: StepStatus;
-}) {
+function LoadingStepRow({ label, status }: { label: string; status: StepStatus }) {
   const icon =
-    status === "done" ? (
-      <span className="text-green-400 text-sm leading-none">✓</span>
-    ) : status === "error" ? (
-      <span className="text-red-400 text-sm leading-none">✗</span>
-    ) : status === "active" ? (
-      <span className="text-white/70 text-sm leading-none animate-pulse">⚡</span>
-    ) : (
-      <span className="text-white/20 text-sm leading-none">·</span>
-    );
+    status === "done"   ? <span className="text-green-400 text-sm leading-none">✓</span>
+    : status === "error"  ? <span className="text-red-400 text-sm leading-none">✗</span>
+    : status === "active" ? <span className="text-white/70 text-sm leading-none animate-pulse">⚡</span>
+    :                       <span className="text-white/20 text-sm leading-none">·</span>;
 
   const textColor =
-    status === "done"
-      ? "text-white/40 line-through"
-      : status === "error"
-      ? "text-red-400/80"
-      : status === "active"
-      ? "text-white/80"
-      : "text-white/20";
+    status === "done"   ? "text-white/40 line-through"
+    : status === "error"  ? "text-red-400/80"
+    : status === "active" ? "text-white/80"
+    :                       "text-white/20";
 
   return (
     <div className="flex items-center gap-3">
-      <div className="w-4 shrink-0 flex items-center justify-center">
-        {icon}
-      </div>
-      <span
-        className={`font-[family-name:var(--font-mono)] text-xs tracking-wide transition-colors duration-300 ${textColor}`}
-      >
+      <div className="w-4 shrink-0 flex items-center justify-center">{icon}</div>
+      <span className={`font-[family-name:var(--font-mono)] text-xs tracking-wide transition-colors duration-300 ${textColor}`}>
         {label}
       </span>
     </div>
@@ -136,45 +78,31 @@ function LoadingStepRow({
 }
 
 export default function DarkroomID() {
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(true);
-  const [answers, setAnswers] = useState<Answers>({
-    handle: "",
-    q1: "",
-    q2: "",
-    q3: "",
-  });
-  const [pendingAdvance, setPendingAdvance] = useState(false);
+  const [answers, setAnswers] = useState<Answers>({ handle: "", goals: [] });
   const [result, setResult] = useState<DarkroomResult | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [errorDetail, setErrorDetail] = useState("");
   const [loadingStep, setLoadingStep] = useState(0);
+  const [claimState, setClaimState] = useState<"idle" | "loading" | "cooldown">("idle");
+  const [cooldownDays, setCooldownDays] = useState(0);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const goTo = (next: number) => {
     setVisible(false);
-    setTimeout(() => {
-      setStep(next);
-      setVisible(true);
-    }, 300);
+    setTimeout(() => { setStep(next); setVisible(true); }, 300);
   };
 
-  const handleOptionSelect = (key: keyof Answers, value: string) => {
-    const updatedAnswers = { ...answers, [key]: value };
-    setAnswers(updatedAnswers);
-    if (!pendingAdvance) {
-      setPendingAdvance(true);
-      setTimeout(() => {
-        setPendingAdvance(false);
-        if (step === 3) {
-          goTo(4);
-          submitQuiz(updatedAnswers);
-        } else {
-          goTo(step + 1);
-        }
-      }, 400);
-    }
+  const toggleGoal = (value: string) => {
+    setAnswers((prev) => {
+      const goals = prev.goals.includes(value)
+        ? prev.goals.filter((g) => g !== value)
+        : [...prev.goals, value];
+      return { ...prev, goals };
+    });
   };
 
   const clearTimers = () => {
@@ -188,14 +116,12 @@ export default function DarkroomID() {
     setErrorDetail("");
     clearTimers();
 
-    // Kick off simulated step progression
     setLoadingStep(1);
     [2, 3, 4].forEach((s, i) => {
       const t = setTimeout(() => setLoadingStep(s), 1500 * (i + 1));
       timersRef.current.push(t);
     });
 
-    // Safety valve: if no response after 20s, surface an error
     const safetyTimer = setTimeout(() => {
       clearTimers();
       setLoadError(true);
@@ -213,30 +139,20 @@ export default function DarkroomID() {
 
       clearTimers();
 
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
 
       const data: DarkroomResult = await res.json();
-
-      // Step 5 = finalizing, brief pause before reveal
       setLoadingStep(5);
       await new Promise((r) => setTimeout(r, 700));
       setResult(data);
     } catch (e) {
       console.error("CLIENT: fetch error", e);
       clearTimers();
-      // Don't overwrite the safety timeout message if it already fired
       if (!loadError) {
         setLoadError(true);
         setErrorDetail(e instanceof Error ? e.message : "Something went wrong");
       }
     }
-  };
-
-  const goToResults = () => {
-    goTo(4);
-    submitQuiz(answers);
   };
 
   const retry = () => {
@@ -252,23 +168,54 @@ export default function DarkroomID() {
     setLoadError(false);
     setErrorDetail("");
     setLoadingStep(0);
-    setAnswers({ handle: "", q1: "", q2: "", q3: "" });
+    setClaimState("idle");
+    setAnswers({ handle: "", goals: [] });
     setStep(0);
     setVisible(true);
   };
 
+  const claimId = async () => {
+    if (!result) return;
+    setClaimState("loading");
+    try {
+      const res = await fetch("/api/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          handle: answers.handle,
+          score: result.score,
+          archetype: result.archetype,
+          tagline: result.tagline,
+          stats: result.stats,
+          analysis: result.analysis,
+          darkroom_line: result.darkroom_line,
+          profile_image_url: result.profile_image_url ?? null,
+        }),
+      });
+      const data = await res.json();
+      if (data.error === "reclaim_cooldown") {
+        setClaimState("cooldown");
+        setCooldownDays(data.days_remaining);
+      } else if (data.success) {
+        localStorage.setItem("darkroom_handle", answers.handle);
+        router.push("/dashboard");
+      } else {
+        setClaimState("idle");
+      }
+    } catch {
+      setClaimState("idle");
+    }
+  };
+
   const getStepStatus = (index: number): StepStatus => {
-    // index is 1-based (matches loadingStep)
     if (loadError && index === loadingStep) return "error";
     if (index < loadingStep) return "done";
     if (index === loadingStep) return "active";
     return "waiting";
   };
 
-  const currentQuestion = step >= 1 && step <= 3 ? questions[step - 1] : null;
-  const currentAnswer = currentQuestion ? answers[currentQuestion.key] : "";
-  const progressWidth = `${(step / 4) * 100}%`;
-
+  // Steps: 0 = handle, 1 = goals, 2 = loading/results
+  const progressWidth = `${(step / 2) * 100}%`;
 
   return (
     <div className="min-h-screen bg-[#050508] text-white font-[family-name:var(--font-outfit)]">
@@ -287,11 +234,7 @@ export default function DarkroomID() {
 
           {/* Screen 0: Handle input */}
           {step === 0 && (
-            <div
-              className={`transition-all duration-500 ${
-                visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-            >
+            <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
               <h1 className="text-3xl font-extrabold tracking-tight text-white mb-3">
                 Drop your handle
               </h1>
@@ -300,21 +243,15 @@ export default function DarkroomID() {
               </p>
 
               <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 mb-8 focus-within:border-white/20 transition-colors">
-                <span className="text-white/30 font-[family-name:var(--font-mono)] text-sm">
-                  @
-                </span>
+                <span className="text-white/30 font-[family-name:var(--font-mono)] text-sm">@</span>
                 <input
                   type="text"
                   value={answers.handle}
-                  onChange={(e) =>
-                    setAnswers((prev) => ({ ...prev, handle: e.target.value }))
-                  }
+                  onChange={(e) => setAnswers((prev) => ({ ...prev, handle: e.target.value }))}
                   placeholder="yourhandle"
                   className="flex-1 bg-transparent text-white placeholder:text-white/20 outline-none text-sm font-[family-name:var(--font-mono)]"
                   autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && answers.handle.length >= 2) goTo(1);
-                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && answers.handle.length >= 2) goTo(1); }}
                 />
               </div>
 
@@ -328,42 +265,33 @@ export default function DarkroomID() {
             </div>
           )}
 
-          {/* Screens 1–3: Questions */}
-          {step >= 1 && step <= 3 && currentQuestion && (
-            <div
-              className={`transition-all duration-500 ${
-                visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-            >
-              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] text-white/30 uppercase mb-4">
-                {currentQuestion.label}
+          {/* Screen 1: Multi-select goals */}
+          {step === 1 && (
+            <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+              <h2 className="text-2xl font-bold text-white mb-1 leading-snug">
+                What are you building toward?
+              </h2>
+              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] text-white/30 uppercase mb-6">
+                select all that apply
               </p>
 
-              <h2 className="text-2xl font-bold text-white mb-6 leading-snug">
-                {currentQuestion.title}
-              </h2>
-
               <div className="flex flex-col gap-3 mb-8">
-                {currentQuestion.options.map((option) => {
-                  const selected = currentAnswer === option.value;
+                {GOAL_OPTIONS.map((option) => {
+                  const selected = answers.goals.includes(option.value);
                   return (
                     <button
                       key={option.value}
-                      onClick={() =>
-                        handleOptionSelect(currentQuestion.key, option.value)
-                      }
-                      className={`group flex items-center gap-4 rounded-xl p-4 border text-left transition-all duration-200 cursor-pointer ${
+                      onClick={() => toggleGoal(option.value)}
+                      className={`flex items-center gap-4 rounded-xl p-4 border text-left transition-all duration-200 cursor-pointer ${
                         selected
                           ? "bg-white/[0.08] border-white/[0.15]"
                           : "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.1]"
                       }`}
                     >
                       <span className="text-xl leading-none">{option.emoji}</span>
-                      <span className="flex-1 text-sm text-white/80 leading-snug">
-                        {option.text}
-                      </span>
+                      <span className="flex-1 text-sm text-white/80 leading-snug">{option.text}</span>
                       {selected && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />
+                        <span className="text-white text-xs font-bold flex-shrink-0">✓</span>
                       )}
                     </button>
                   );
@@ -372,49 +300,37 @@ export default function DarkroomID() {
 
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => goTo(step - 1)}
+                  onClick={() => goTo(0)}
                   className="text-sm text-white/40 hover:text-white/60 transition-colors"
                 >
                   ← Back
                 </button>
                 <button
-                  onClick={step === 3 ? goToResults : () => goTo(step + 1)}
-                  disabled={!currentAnswer}
+                  onClick={() => { goTo(2); submitQuiz(answers); }}
+                  disabled={answers.goals.length === 0}
                   className="flex-1 rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
                 >
-                  {step === 3 ? "Get my ID →" : "Continue →"}
+                  Get my ID →
                 </button>
               </div>
             </div>
           )}
 
-          {/* Screen 4: Loading + Results */}
-          {step === 4 && (
-            <div
-              className={`transition-all duration-500 ${
-                visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-            >
+          {/* Screen 2: Loading + Results */}
+          {step === 2 && (
+            <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+
               {/* Loading / error state */}
               {!result && (
                 <div className="flex flex-col items-center">
-                  {/* Spinner (hidden on error) */}
                   {!loadError && (
                     <div className="mb-8 w-7 h-7 rounded-full border-2 border-white/15 border-t-white/60 animate-spin" />
                   )}
-
-                  {/* Step list */}
                   <div className="w-full max-w-sm flex flex-col gap-3 mb-6">
                     {LOADING_STEPS.map((label, i) => (
-                      <LoadingStepRow
-                        key={label}
-                        label={label}
-                        status={getStepStatus(i + 1)}
-                      />
+                      <LoadingStepRow key={label} label={label} status={getStepStatus(i + 1)} />
                     ))}
                   </div>
-
-                  {/* Error detail + retry */}
                   {loadError && (
                     <div className="w-full max-w-sm flex flex-col gap-4 pt-2">
                       {errorDetail && (
@@ -462,25 +378,13 @@ export default function DarkroomID() {
 
                   {/* Stat bars */}
                   <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 flex flex-col gap-4">
-                    {(
-                      Object.entries(result.stats) as [
-                        keyof typeof result.stats,
-                        number
-                      ][]
-                    ).map(([key, val]) => (
-                      <StatBar
-                        key={key}
-                        label={key}
-                        value={val}
-                        color={statColors[key] ?? "bg-white"}
-                      />
+                    {(Object.entries(result.stats) as [keyof typeof result.stats, number][]).map(([key, val]) => (
+                      <StatBar key={key} label={key} value={val} color={statColors[key] ?? "bg-white"} />
                     ))}
                   </div>
 
                   {/* Analysis */}
-                  <div className="text-sm text-white/60 leading-7">
-                    {result.analysis}
-                  </div>
+                  <div className="text-sm text-white/60 leading-7">{result.analysis}</div>
 
                   {/* Darkroom line */}
                   <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-white/30 italic text-center">
@@ -498,6 +402,21 @@ export default function DarkroomID() {
                     darkroomLine={result.darkroom_line}
                     profileImageUrl={result.profile_image_url}
                   />
+
+                  {/* Claim */}
+                  {claimState === "cooldown" ? (
+                    <div className="w-full rounded-xl border border-white/[0.05] px-5 py-3 text-sm text-white/25 text-center">
+                      You can reclaim in {cooldownDays} day{cooldownDays !== 1 ? "s" : ""}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={claimId}
+                      disabled={claimState === "loading"}
+                      className="w-full rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+                    >
+                      {claimState === "loading" ? "Claiming…" : "Claim my ID →"}
+                    </button>
+                  )}
 
                   <button
                     onClick={startOver}

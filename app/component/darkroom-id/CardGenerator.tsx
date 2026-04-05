@@ -7,7 +7,7 @@ interface CardGeneratorProps {
   score: number;
   archetype: string;
   tagline: string;
-  stats: { dedication: number; consistency: number; stealth: number; momentum: number };
+  stats: { focus: number; consistency: number; reliability: number; growth: number };
   analysis: string;
   darkroomLine: string;
   profileImageUrl?: string;
@@ -22,10 +22,10 @@ const TWEET_TEMPLATES = [
 ];
 
 const STAT_COLORS: Record<string, string> = {
-  dedication: "#60A5FA",
+  focus:       "#60A5FA",
   consistency: "#C084FC",
-  stealth: "#34D399",
-  momentum: "#FBBF24",
+  reliability: "#34D399",
+  growth:      "#FBBF24",
 };
 
 function drawRoundedRect(
@@ -228,10 +228,10 @@ export default function CardGenerator({
       const maxBarW = cellW - 20; // bar max width per cell (with 10px padding each side)
 
       const statGrid: Array<{ key: keyof typeof stats; col: number; row: number }> = [
-        { key: "dedication",  col: 0, row: 0 },
+        { key: "focus",       col: 0, row: 0 },
         { key: "consistency", col: 1, row: 0 },
-        { key: "stealth",     col: 0, row: 1 },
-        { key: "momentum",    col: 1, row: 1 },
+        { key: "reliability", col: 0, row: 1 },
+        { key: "growth",      col: 1, row: 1 },
       ];
 
       statGrid.forEach(({ key, col, row }) => {

@@ -5,10 +5,10 @@ export interface DarkroomResult {
   archetype: string;
   tagline: string;
   stats: {
-    dedication: number;
+    focus: number;
     consistency: number;
-    stealth: number;
-    momentum: number;
+    reliability: number;
+    growth: number;
   };
   analysis: string;
   darkroom_line: string;
@@ -35,67 +35,65 @@ function getArchetype(score: number): string {
 
 function getFallbackResult(
   handle: string,
-  q1: string,
-  q2: string,
-  q3: string,
+  goals: string[],
   warnings: string[] = []
 ): DarkroomResult {
-  const q1Score =
-    q1 === "6plus" ? 26 : q1 === "3to5" ? 19 : q1 === "1to2" ? 12 : 5;
+  let focus = 25, consistency = 25, reliability = 25, growth = 25;
 
-  const q2Score =
-    q2 === "daily" ? 24 : q2 === "rhythm" ? 17 : q2 === "waves" ? 11 : 4;
+  for (const goal of goals) {
+    if (goal === "brand")     { focus += 5;  consistency += 5; }
+    if (goal === "skills")    { focus += 8;  growth += 5; }
+    if (goal === "project")   { focus += 10; reliability += 5; }
+    if (goal === "community") { reliability += 8; consistency += 5; }
+    if (goal === "freedom")   { growth += 5; consistency += 3; }
+    if (goal === "exploring") { growth += 8; }
+  }
 
-  const q3Score =
-    q3 === "silence" ? 18 : q3 === "document" ? 14 : q3 === "public" ? 11 : 6;
+  if (/build|dev|ship|hack|code/i.test(handle)) {
+    reliability += 5;
+    focus += 5;
+  }
 
-  const handleBonus =
-    /build|dev|ship|hack|code/i.test(handle) ? 7 : 0;
+  focus       = Math.min(75, Math.max(15, focus));
+  consistency = Math.min(75, Math.max(15, consistency));
+  reliability = Math.min(75, Math.max(15, reliability));
+  growth      = Math.min(75, Math.max(15, growth));
 
-  const rawScore = q1Score + q2Score + q3Score + handleBonus;
-  const score = Math.min(75, Math.max(30, rawScore));
+  const score = Math.min(75, Math.max(30, Math.round((focus + consistency + reliability + growth) / 4)));
   const archetype = getArchetype(score);
 
-  const dedicationStat = Math.min(75, Math.max(15, Math.round(q1Score / 26 * 75)));
-  const consistencyStat = Math.min(75, Math.max(15, Math.round(q2Score / 24 * 75)));
-  const stealthStat = Math.min(75, q3Score === 18 ? 70 : q3Score === 14 ? 50 : q3Score === 11 ? 28 : 42);
-  const momentumStat = Math.min(75, Math.max(15, Math.round((dedicationStat + consistencyStat) / 2) + handleBonus));
-
   const taglines: Record<string, string> = {
-    "Ghost Builder": "ships in the dark, drops in the light",
-    "Silent Architect": "the blueprint speaks for itself",
-    "Shadow Operator": "you won't see me, but you'll see my work",
-    "Half Built": "foundation solid, still stacking floors",
-    "Curious Lurker": "reads everything, ships soon",
-    "Almost Based": "one commit away from greatness",
+    "Ghost Builder":          "ships in the dark, drops in the light",
+    "Silent Architect":       "the blueprint speaks for itself",
+    "Shadow Operator":        "you won't see me, but you'll see my work",
+    "Half Built":             "foundation solid, still stacking floors",
+    "Curious Lurker":         "reads everything, ships soon",
+    "Almost Based":           "one commit away from greatness",
     "Main Character Loading": "the arc hasn't even started",
-    "Fresh Compile": "first build, first bugs, first glory",
-    "NPC (for now)": "everyone's origin story starts somewhere",
+    "Fresh Compile":          "first build, first bugs, first glory",
+    "NPC (for now)":          "everyone's origin story starts somewhere",
   };
 
   const lines: Record<string, string> = {
-    "Ghost Builder": "The darkroom is your natural habitat.",
-    "Silent Architect": "Plans built in the dark, revealed in the light.",
-    "Shadow Operator": "The work speaks. You don't have to.",
-    "Half Built": "The foundation is solid. Keep stacking.",
-    "Curious Lurker": "The room is watching. Time to ship.",
-    "Almost Based": "One push away from legend status.",
+    "Ghost Builder":          "The Darkroom is where the real work happens.",
+    "Silent Architect":       "In The Darkroom, your commits echo forever.",
+    "Shadow Operator":        "The work speaks. You don't have to.",
+    "Half Built":             "The foundation is solid. Keep stacking.",
+    "Curious Lurker":         "The room is watching. Time to ship.",
+    "Almost Based":           "One push away from legend status.",
     "Main Character Loading": "The origin story starts here.",
-    "Fresh Compile": "Every pro was once a beginner. Welcome.",
-    "NPC (for now)": "The darkroom has a seat with your name on it.",
+    "Fresh Compile":          "Every pro was once a beginner. Welcome.",
+    "NPC (for now)":          "The Darkroom has a seat with your name on it.",
   };
+
+  const goalLabels = goals.join(", ") || "something";
 
   return {
     score,
     archetype,
     tagline: taglines[archetype] ?? "built different",
-    stats: {
-      dedication: dedicationStat,
-      consistency: consistencyStat,
-      stealth: stealthStat,
-      momentum: momentumStat,
-    },
-    analysis: `@${handle} — the quiz answers tell a story. You're building with intention, keeping your cards close, and the profile checks out. The darkroom recognizes the pattern.`,
+    stats: { focus, consistency, reliability, growth },
+    analysis: `@${handle} — you're building toward ${goalLabels}. The profile tells a story of someone who hasn't stopped moving. The darkroom sees the pattern and it's early days in a long game.`,
     darkroom_line: lines[archetype] ?? "Welcome to the darkroom.",
     isFallback: true,
     warnings,
@@ -104,9 +102,9 @@ function getFallbackResult(
 
 export async function POST(req: NextRequest) {
   console.log("API ROUTE HIT", new Date().toISOString());
-  const { handle, q1, q2, q3 } = await req.json();
+  const { handle, goals } = await req.json();
 
-  if (!handle || !q1 || !q2 || !q3) {
+  if (!handle || !goals || !Array.isArray(goals) || goals.length === 0) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
@@ -181,9 +179,7 @@ export async function POST(req: NextRequest) {
 
         if (tweetsRes.ok) {
           const tweetsData = await tweetsRes.json();
-          recentTweets = (tweetsData.data ?? []).map(
-            (t: { text: string }) => t.text
-          );
+          recentTweets = (tweetsData.data ?? []).map((t: { text: string }) => t.text);
           console.log("Step 2 result: got", recentTweets.length, "tweets");
         } else {
           const errorBody = await tweetsRes.text().catch(() => "(unreadable)");
@@ -207,21 +203,17 @@ export async function POST(req: NextRequest) {
   if (!anthropicKey) {
     console.log("Fallback: using deterministic scoring (no API key)");
     warnings.push("claude_api_failed: No API key configured, using fallback scoring");
-    return NextResponse.json({ ...getFallbackResult(handle, q1, q2, q3, warnings), profile_image_url: profileImageUrl || undefined });
+    return NextResponse.json({ ...getFallbackResult(handle, goals, warnings), profile_image_url: profileImageUrl || undefined });
   }
 
   console.log("Step 3: Calling Claude API");
-  console.log("Sending to Claude:", JSON.stringify({ handle, q1, q2, q3, bio, followers: followersCount, tweetCount: recentTweets.length }));
+  console.log("Sending to Claude:", JSON.stringify({ handle, goals, bio, followers: followersCount, tweetCount: recentTweets.length }));
 
   const userMessage = `
 Handle: @${handle}
+Selected goals: ${goals.join(", ")}
 Bio: ${bio || "(not available)"}
 Followers: ${followersCount} | Following: ${followingCount} | Tweets: ${tweetCount}
-
-Quiz answers:
-- How many hours a day do you spend building or learning? → "${q1}"
-- How consistent are you? → "${q2}"
-- What's your relationship with sharing your work? → "${q3}"
 
 Recent tweets (last 10):
 ${recentTweets.length > 0 ? recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\n") : "(not available)"}
@@ -240,32 +232,34 @@ ${recentTweets.length > 0 ? recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
-        system: `You are The Darkroom ID generator. Analyze the user's X profile and quiz answers to create a builder personality profile.
+        system: `You are The Darkroom ID generator. Analyze the user's X profile data and their stated goals to create a builder personality profile.
 
-The quiz measures real builder habits:
-- Q1: Daily time investment (6plus=max dedication, notenough=starting)
-- Q2: Consistency (daily=iron discipline, motivation=sporadic)
-- Q3: Sharing style (silence=stealth builder, public=open builder, absorbing=learner)
+The user selected their building goals from: brand, skills, project, community, freedom, exploring. They may have selected multiple.
 
-ARCHETYPES (pick ONE based on score):
+You have their X profile data: bio, follower count, tweet count, recent tweets.
+
+METRICS to score (each 15-75, this is a quiz-only score, bonus points from lessons/certs come later):
+- focus: How deep and specialized is this person? Do their tweets and bio show expertise in specific areas or are they scattered? Consistent topics = high. Random everything = low.
+- consistency: How regularly do they show up? Tweet frequency, account age vs activity ratio. Daily grinder = high. Ghost who tweets once a month = low.
+- reliability: Could a project hire this person? Professional tone, constructive engagement, mentions of real work/roles in bio, transparent about their journey. Shill-only accounts = low.
+- growth: Real growth potential, not vanity. Engagement quality over follower count. Learning-oriented content, helping others, improving over time = high. Stagnant or fake engagement = low.
+
+GOAL SIGNALS (how their selected goals influence scoring):
+- brand + project = high focus, high reliability
+- skills + exploring = high growth
+- community + brand = high reliability, high consistency
+- freedom + skills = high growth, high focus
+- project alone = highest focus
+- exploring alone = honest, boost growth slightly
+- Many goals selected = ambitious but possibly scattered, moderate focus
+
+ARCHETYPES (pick ONE based on total score):
 High tier (60-75): 'Silent Architect' (the blueprint speaks for itself), 'Ghost Builder' (ships in the dark, drops in the light), 'Shadow Operator' (you won't see me, but you'll see my work)
 Mid tier (45-59): 'Half Built' (foundation solid, still stacking floors), 'Curious Lurker' (reads everything, ships soon), 'Almost Based' (one commit away from greatness)
 Low tier (30-44): 'Main Character Loading' (the arc hasn't even started), 'Fresh Compile' (first build, first bugs, first glory), 'NPC (for now)' (everyone's origin story starts somewhere)
 
-STATS to generate (each 15-75). Scores are out of 75 — Phase 2 lessons and certifications add up to +25 bonus points:
-- dedication: how much time they invest daily
-- consistency: how regular they are
-- stealth: how much they build in silence vs public (high = silent, low = public sharer)
-- momentum: overall energy combining all signals + X profile activity
-
-SCORING GUIDE:
-- 6plus hours + daily + silence = highest scores (Silent Architect / Ghost Builder)
-- 3to5 + rhythm + document = solid mid tier
-- notenough + motivation + absorbing = lower tier but always encouraging
-- X profile boosts: active tweeter = momentum boost, bio with build/ship/dev = dedication boost, high follower ratio = influence
-
 Respond ONLY with JSON (no markdown, no backticks):
-{"score": <30-75>, "archetype": "<exact name from list>", "tagline": "<max 8 words. Builder-focused. Reference something specific from their X bio or tweets. About their work ethic, building habits, or craft. NEVER mention privacy, ZK, proof, or crypto. Examples: 'building so hard sleep forgot you', 'commits speak louder than tweets', 'shipping while they sleep'. Must be personal and witty.>", "stats": {"dedication": <15-75>, "consistency": <15-75>, "stealth": <15-75>, "momentum": <15-75>}, "analysis": "<3 sentences. Fun, reference their handle and actual habits. Never mean, always encouraging.>", "darkroom_line": "<One Darkroom themed line about building. NEVER mention privacy or ZK. Focus on builder mindset, shipping, grinding, focus. Examples: 'The Darkroom is where the real work happens.', 'In The Darkroom, your commits echo forever.'>"}`,
+{"score": <30-75>, "archetype": "<exact name from list>", "tagline": "<max 8 words. Builder-focused. Reference something from their X bio or tweets. NEVER mention privacy, ZK, proof, or crypto. About their work ethic or craft. Must be personal and witty.>", "stats": {"focus": <15-75>, "consistency": <15-75>, "reliability": <15-75>, "growth": <15-75>}, "analysis": "<3 sentences. Reference their handle, their actual tweets/bio content, and their selected goals. Fun, encouraging, never mean.>", "darkroom_line": "<One Darkroom themed line about building. NEVER mention privacy or ZK. Focus on builder mindset.>"}`,
         messages: [{ role: "user", content: userMessage }],
       }),
       signal: claudeController.signal,
@@ -275,7 +269,7 @@ Respond ONLY with JSON (no markdown, no backticks):
     if (!claudeRes.ok) {
       console.log("Fallback: using deterministic scoring (Claude returned", claudeRes.status, ")");
       warnings.push(`claude_api_failed: AI generation failed (${claudeRes.status}), using fallback scoring`);
-      return NextResponse.json({ ...getFallbackResult(handle, q1, q2, q3, warnings), profile_image_url: profileImageUrl || undefined });
+      return NextResponse.json({ ...getFallbackResult(handle, goals, warnings), profile_image_url: profileImageUrl || undefined });
     }
 
     const claudeData = await claudeRes.json();
@@ -291,6 +285,6 @@ Respond ONLY with JSON (no markdown, no backticks):
       : e instanceof Error ? e.message : "AI generation failed";
     console.log("Fallback: using deterministic scoring —", reason);
     warnings.push(`claude_api_failed: ${reason}, using fallback scoring`);
-    return NextResponse.json({ ...getFallbackResult(handle, q1, q2, q3, warnings), profile_image_url: profileImageUrl || undefined });
+    return NextResponse.json({ ...getFallbackResult(handle, goals, warnings), profile_image_url: profileImageUrl || undefined });
   }
 }
