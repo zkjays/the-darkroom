@@ -30,33 +30,37 @@ interface DashboardData {
   streak: StreakData | null;
 }
 
+// Ordered stat definitions with hex colors and old-name fallbacks for Supabase migration
+const STATS = [
+  { key: "focus",       label: "FOCUS",       color: "#60A5FA", fallback: "dedication" },
+  { key: "consistency", label: "CONSISTENCY",  color: "#C084FC", fallback: "consistency" },
+  { key: "reliability", label: "RELIABILITY",  color: "#34D399", fallback: "stealth" },
+  { key: "growth",      label: "GROWTH",       color: "#FBBF24", fallback: "momentum" },
+] as const;
+
 const statConfig: Record<
   string,
-  { color: string; improvements: Array<{ label: string; points: string }> }
+  { improvements: Array<{ label: string; points: string }> }
 > = {
   focus: {
-    color: "bg-blue-400",
     improvements: [
       { label: "Complete deep-dive lessons", points: "+5 pts" },
       { label: "Earn Specialist certification", points: "+15 pts" },
     ],
   },
   consistency: {
-    color: "bg-purple-400",
     improvements: [
       { label: "Maintain a 7-day streak", points: "+3 pts" },
       { label: "30 days in a row", points: "+10 pts" },
     ],
   },
   reliability: {
-    color: "bg-emerald-400",
     improvements: [
       { label: "Complete Builder Basics course", points: "+5 pts" },
       { label: "Earn Trusted Builder badge", points: "+15 pts" },
     ],
   },
   growth: {
-    color: "bg-amber-400",
     improvements: [
       { label: "Share your journey publicly", points: "+3 pts" },
       { label: "Help 3 builders this week", points: "+5 pts" },
@@ -123,8 +127,8 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
       </div>
       <div className="h-[3px] w-full rounded-full bg-white/[0.08] overflow-hidden">
         <div
-          className={`h-full rounded-full ${color} transition-all duration-700 ease-out`}
-          style={{ width: `${(value / 75) * 100}%` }}
+          className="h-full rounded-full transition-all duration-700 ease-out"
+          style={{ width: `${(value / 75) * 100}%`, backgroundColor: color || "#ffffff" }}
         />
       </div>
     </div>
@@ -133,23 +137,27 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
 
 function StatCard({
   statKey,
+  label,
   value,
+  color = "#ffffff",
 }: {
   statKey: string;
+  label: string;
   value: number;
+  color?: string;
 }) {
-  const cfg = statConfig[statKey];
+  const cfg = statConfig[statKey] ?? { improvements: [] };
   return (
     <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5 flex flex-col gap-4 hover:bg-white/[0.04] hover:border-white/[0.1] transition-all">
       <div className="flex flex-col gap-2">
         <p className="font-[family-name:var(--font-mono)] text-[11px] tracking-[0.2em] text-white/40 uppercase">
-          {statKey}
+          {label}
         </p>
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-bold text-white">{value}</span>
           <span className="font-[family-name:var(--font-mono)] text-xs text-white/25">/75</span>
         </div>
-        <StatBar label="" value={value} color={cfg.color} />
+        <StatBar label="" value={value} color={color} />
       </div>
 
       <div className="flex flex-col gap-2 pt-1 border-t border-white/[0.05]">
@@ -298,9 +306,22 @@ export default function Dashboard() {
             Stats
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {(Object.entries(data.stats) as [string, number][]).map(([key, val]) => (
-              <StatCard key={key} statKey={key} value={val} />
-            ))}
+            {(() => {
+              // Support both new names (focus/reliability/growth) and old Supabase rows (dedication/stealth/momentum)
+              const s = (data.stats ?? {}) as Record<string, number>;
+              return STATS.map((stat) => {
+                const value = s[stat.key] ?? s[stat.fallback] ?? 0;
+                return (
+                  <StatCard
+                    key={stat.key}
+                    statKey={stat.key}
+                    label={stat.label}
+                    value={value}
+                    color={stat.color}
+                  />
+                );
+              });
+            })()}
           </div>
         </div>
 
