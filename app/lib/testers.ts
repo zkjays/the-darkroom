@@ -11,6 +11,7 @@ export const APPROVED_TESTERS = [
   "jim_buildr",
   "rb_investor45",
   "pixassohq",
+  "Wickedgene_"
 ];
 
 export function isTester(handle: string): boolean {
