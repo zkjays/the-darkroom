@@ -48,6 +48,62 @@ async function upsertStreak(db: ReturnType<typeof getServiceSupabase>, handle: s
     .eq("handle", handle);
 }
 
+async function awardReferralXp(
+  db: ReturnType<typeof getServiceSupabase>,
+  referred_handle: string
+) {
+  // Check if this handle was referred
+  const { data: referral } = await db
+    .from("referrals")
+    .select("referrer_handle, rewarded")
+    .eq("referred_handle", referred_handle)
+    .single();
+
+  if (!referral || referral.rewarded) return;
+
+  const referrer = referral.referrer_handle;
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  // Daily cap: max 25 XP from referrals per day
+  const { data: todayEarnings } = await db
+    .from("xp_earnings")
+    .select("amount")
+    .eq("handle", referrer)
+    .eq("source", "referral")
+    .gte("created_at", todayStr + "T00:00:00.000Z");
+
+  const earnedToday = (todayEarnings ?? []).reduce((s, r) => s + (r.amount ?? 0), 0);
+  if (earnedToday >= 25) return;
+
+  const xpAmount = Math.min(5, 25 - earnedToday);
+
+  // Award XP to referrer
+  const { data: referrerRow } = await db
+    .from("darkroom_ids")
+    .select("bonus_points")
+    .eq("handle", referrer)
+    .single();
+
+  await db
+    .from("darkroom_ids")
+    .update({ bonus_points: (referrerRow?.bonus_points ?? 0) + xpAmount })
+    .eq("handle", referrer);
+
+  // Log XP earning
+  await db.from("xp_earnings").insert({
+    handle: referrer,
+    source: "referral",
+    amount: xpAmount,
+    meta: { referred_handle },
+  });
+
+  // Mark referral as rewarded
+  await db
+    .from("referrals")
+    .update({ rewarded: true })
+    .eq("referred_handle", referred_handle);
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
@@ -96,6 +152,7 @@ export async function POST(req: NextRequest) {
     }
 
     await upsertStreak(db, handle);
+    await awardReferralXp(db, handle);
     return NextResponse.json({ success: true, claimed: true });
   }
 

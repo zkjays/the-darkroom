@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+export const dynamic = "force-dynamic";
+
+import { useState, useRef, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../component/landing/Navbar";
 import CardGenerator from "../component/darkroom-id/CardGenerator";
 import type { DarkroomResult } from "../api/generate/route";
@@ -39,8 +41,8 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex justify-between items-center">
-        <span className="font-mono text-[10px] tracking-[0.2em] text-white/40 uppercase">{label}</span>
-        <span className="font-mono text-xs text-white/50">{value}</span>
+        <span className="font-mono text-[10px] tracking-[0.2em] text-slate-300 uppercase">{label}</span>
+        <span className="font-mono text-xs text-slate-300">{value}</span>
       </div>
       <div className="h-0.75 w-full rounded-full bg-white/10 overflow-hidden">
         <div
@@ -58,14 +60,14 @@ function LoadingStepRow({ label, status }: { label: string; status: StepStatus }
   const icon =
     status === "done"   ? <span className="text-green-400 text-sm leading-none">✓</span>
     : status === "error"  ? <span className="text-red-400 text-sm leading-none">✗</span>
-    : status === "active" ? <span className="text-white/70 text-sm leading-none animate-pulse">⚡</span>
-    :                       <span className="text-white/20 text-sm leading-none">·</span>;
+    : status === "active" ? <span className="text-slate-200 text-sm leading-none animate-pulse">⚡</span>
+    :                       <span className="text-slate-500 text-sm leading-none">·</span>;
 
   const textColor =
-    status === "done"   ? "text-white/40 line-through"
+    status === "done"   ? "text-slate-300 line-through"
     : status === "error"  ? "text-red-400/80"
-    : status === "active" ? "text-white/80"
-    :                       "text-white/20";
+    : status === "active" ? "text-white"
+    :                       "text-slate-500";
 
   return (
     <div className="flex items-center gap-3">
@@ -79,6 +81,7 @@ function LoadingStepRow({ label, status }: { label: string; status: StepStatus }
 
 export default function DarkroomID() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(true);
   const [answers, setAnswers] = useState<Answers>({ handle: "", goals: [] });
@@ -88,8 +91,14 @@ export default function DarkroomID() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [claimState, setClaimState] = useState<"idle" | "loading" | "cooldown">("idle");
   const [cooldownDays, setCooldownDays] = useState(0);
+  const [referrerHandle, setReferrerHandle] = useState<string | null>(null);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref && ref.length >= 2) setReferrerHandle(ref);
+  }, [searchParams]);
 
   const goTo = (next: number) => {
     setVisible(false);
@@ -193,11 +202,19 @@ export default function DarkroomID() {
         }),
       });
       const data = await res.json();
+      console.log("Claim response:", data);
       if (data.error === "reclaim_cooldown") {
         setClaimState("cooldown");
         setCooldownDays(data.days_remaining);
       } else if (data.success) {
         localStorage.setItem("darkroom_handle", answers.handle);
+        if (referrerHandle) {
+          fetch("/api/referrals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ referrer_handle: referrerHandle, referred_handle: answers.handle }),
+          }).catch(() => {});
+        }
         router.push("/dashboard");
       } else {
         setClaimState("idle");
@@ -235,21 +252,27 @@ export default function DarkroomID() {
           {/* Screen 0: Handle input */}
           {step === 0 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+              {referrerHandle && (
+                <div className="mb-6 inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-full px-4 py-1.5">
+                  <span className="text-slate-400 text-xs">Invited by</span>
+                  <span className="font-[family-name:var(--font-mono)] text-xs text-slate-200">@{referrerHandle}</span>
+                </div>
+              )}
               <h1 className="text-3xl font-extrabold tracking-tight text-white mb-3">
                 Drop your handle
               </h1>
-              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] text-white/30 uppercase mb-8">
+              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] text-slate-400 uppercase mb-8">
                 we&apos;ll peek at your profile. no data stored.
               </p>
 
               <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 mb-8 focus-within:border-white/20 transition-colors">
-                <span className="text-white/30 font-[family-name:var(--font-mono)] text-sm">@</span>
+                <span className="text-slate-400 font-[family-name:var(--font-mono)] text-sm">@</span>
                 <input
                   type="text"
                   value={answers.handle}
                   onChange={(e) => setAnswers((prev) => ({ ...prev, handle: e.target.value }))}
                   placeholder="yourhandle"
-                  className="flex-1 bg-transparent text-white placeholder:text-white/20 outline-none text-sm font-[family-name:var(--font-mono)]"
+                  className="flex-1 bg-transparent text-white placeholder:text-slate-500 outline-none text-sm font-[family-name:var(--font-mono)]"
                   autoFocus
                   onKeyDown={(e) => { if (e.key === "Enter" && answers.handle.length >= 2) goTo(1); }}
                 />
@@ -271,7 +294,7 @@ export default function DarkroomID() {
               <h2 className="text-2xl font-bold text-white mb-1 leading-snug">
                 What are you building toward?
               </h2>
-              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] text-white/30 uppercase mb-6">
+              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] text-slate-400 uppercase mb-6">
                 select all that apply
               </p>
 
@@ -289,7 +312,7 @@ export default function DarkroomID() {
                       }`}
                     >
                       <span className="text-xl leading-none">{option.emoji}</span>
-                      <span className="flex-1 text-sm text-white/80 leading-snug">{option.text}</span>
+                      <span className="flex-1 text-sm text-white leading-snug">{option.text}</span>
                       {selected && (
                         <span className="text-white text-xs font-bold flex-shrink-0">✓</span>
                       )}
@@ -301,7 +324,7 @@ export default function DarkroomID() {
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => goTo(0)}
-                  className="text-sm text-white/40 hover:text-white/60 transition-colors"
+                  className="text-sm text-slate-300 hover:text-slate-200 transition-colors"
                 >
                   ← Back
                 </button>
@@ -347,7 +370,7 @@ export default function DarkroomID() {
                         </button>
                         <button
                           onClick={startOver}
-                          className="rounded-xl border border-white/10 px-5 py-3 text-sm text-white/40 hover:text-white/70 hover:border-white/20 transition-all"
+                          className="rounded-xl border border-white/10 px-5 py-3 text-sm text-slate-300 hover:text-slate-200 hover:border-white/20 transition-all"
                         >
                           Start over
                         </button>
@@ -365,13 +388,13 @@ export default function DarkroomID() {
                     <div className="font-[family-name:var(--font-mono)] text-[72px] font-bold leading-none text-white mb-2">
                       {result.score}
                     </div>
-                    <div className="font-[family-name:var(--font-mono)] text-xs tracking-[0.3em] text-white/30 uppercase mb-4">
+                    <div className="font-[family-name:var(--font-mono)] text-xs tracking-[0.3em] text-slate-400 uppercase mb-4">
                       darkroom score
                     </div>
                     <div className="text-2xl font-extrabold tracking-tight text-white mb-2">
                       {result.archetype}
                     </div>
-                    <div className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-white/40 uppercase">
+                    <div className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-slate-300 uppercase">
                       {result.tagline}
                     </div>
                   </div>
@@ -384,10 +407,10 @@ export default function DarkroomID() {
                   </div>
 
                   {/* Analysis */}
-                  <div className="text-sm text-white/60 leading-7">{result.analysis}</div>
+                  <div className="text-sm text-slate-200 leading-7">{result.analysis}</div>
 
                   {/* Darkroom line */}
-                  <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-white/30 italic text-center">
+                  <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-slate-400 italic text-center">
                     {result.darkroom_line}
                   </p>
 
@@ -405,7 +428,7 @@ export default function DarkroomID() {
 
                   {/* Claim */}
                   {claimState === "cooldown" ? (
-                    <div className="w-full rounded-xl border border-white/[0.05] px-5 py-3 text-sm text-white/25 text-center">
+                    <div className="w-full rounded-xl border border-white/[0.05] px-5 py-3 text-sm text-slate-500 text-center">
                       You can reclaim in {cooldownDays} day{cooldownDays !== 1 ? "s" : ""}
                     </div>
                   ) : (
@@ -420,7 +443,7 @@ export default function DarkroomID() {
 
                   <button
                     onClick={startOver}
-                    className="rounded-xl border border-white/10 px-5 py-3 text-sm text-white/50 hover:text-white/80 hover:border-white/20 transition-all"
+                    className="rounded-xl border border-white/10 px-5 py-3 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all"
                   >
                     Try again
                   </button>

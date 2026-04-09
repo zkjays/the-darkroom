@@ -8,6 +8,14 @@ export default function Navbar() {
   const [hovered, setHovered] = useState(false);
   const [visible, setVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const [navLink, setNavLink] = useState({ href: "/darkroom-id", text: "Get ID →" });
+
+  useEffect(() => {
+    const handle = localStorage.getItem("darkroom_handle");
+    if (handle) {
+      setNavLink({ href: "/dashboard", text: "Dashboard →" }); // eslint-disable-line react-hooks/set-state-in-effect
+    }
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -53,10 +61,10 @@ export default function Navbar() {
         </Link>
 
         <Link
-          href="/darkroom-id"
+          href={navLink.href}
           className="text-sm text-white/60 transition hover:text-white"
         >
-          Get ID →
+          {navLink.text}
         </Link>
       </div>
     </header>
