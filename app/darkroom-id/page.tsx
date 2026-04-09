@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../component/landing/Navbar";
 import CardGenerator from "../component/darkroom-id/CardGenerator";
@@ -79,7 +79,7 @@ function LoadingStepRow({ label, status }: { label: string; status: StepStatus }
   );
 }
 
-export default function DarkroomID() {
+function DarkroomIDContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
@@ -454,5 +454,17 @@ export default function DarkroomID() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function DarkroomID() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#050508] flex items-center justify-center">
+        <div className="w-7 h-7 rounded-full border-2 border-white/15 border-t-white/60 animate-spin" />
+      </div>
+    }>
+      <DarkroomIDContent />
+    </Suspense>
   );
 }
