@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../component/landing/Navbar";
+import { isTester } from "@/app/lib/testers";
 import CardGenerator from "../component/darkroom-id/CardGenerator";
 import type { DarkroomResult } from "../api/generate/route";
 
@@ -92,6 +93,7 @@ function DarkroomIDContent() {
   const [claimState, setClaimState] = useState<"idle" | "loading" | "cooldown">("idle");
   const [cooldownDays, setCooldownDays] = useState(0);
   const [referrerHandle, setReferrerHandle] = useState<string | null>(null);
+  const [showWaitlist, setShowWaitlist] = useState(false);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -249,8 +251,35 @@ function DarkroomIDContent() {
       <main className="flex min-h-screen items-center justify-center px-6 pt-24 pb-16">
         <div className="w-full max-w-md">
 
+          {/* Waitlist screen */}
+          {showWaitlist && (
+            <div className="flex flex-col items-center text-center gap-5">
+              <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.3em] text-slate-400 uppercase">
+                Early Access
+              </p>
+              <h1 className="text-2xl font-bold text-white leading-snug">
+                Not on the list yet.
+              </h1>
+              <p className="text-slate-300 text-sm leading-relaxed max-w-xs">
+                The Darkroom is in closed alpha. We&apos;re building with a small group first.
+              </p>
+              <p className="font-[family-name:var(--font-mono)] text-sm text-slate-200">
+                @{answers.handle}
+              </p>
+              <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
+                Want in? DM <span className="text-white">@zkjays</span> on X
+              </p>
+              <button
+                onClick={() => { setShowWaitlist(false); setAnswers((prev) => ({ ...prev, handle: "" })); }}
+                className="mt-2 rounded-xl border border-white/10 px-6 py-3 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all"
+              >
+                Try another handle
+              </button>
+            </div>
+          )}
+
           {/* Screen 0: Handle input */}
-          {step === 0 && (
+          {!showWaitlist && step === 0 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
               {referrerHandle && (
                 <div className="mb-6 inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-full px-4 py-1.5">
@@ -274,12 +303,12 @@ function DarkroomIDContent() {
                   placeholder="yourhandle"
                   className="flex-1 bg-transparent text-white placeholder:text-slate-500 outline-none text-sm font-[family-name:var(--font-mono)]"
                   autoFocus
-                  onKeyDown={(e) => { if (e.key === "Enter" && answers.handle.length >= 2) goTo(1); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && answers.handle.length >= 2) { if (!isTester(answers.handle)) { setShowWaitlist(true); } else { goTo(1); } } }}
                 />
               </div>
 
               <button
-                onClick={() => goTo(1)}
+                onClick={() => { if (!isTester(answers.handle)) { setShowWaitlist(true); } else { goTo(1); } }}
                 disabled={answers.handle.length < 2}
                 className="w-full rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
               >
@@ -289,7 +318,7 @@ function DarkroomIDContent() {
           )}
 
           {/* Screen 1: Multi-select goals */}
-          {step === 1 && (
+          {!showWaitlist && step === 1 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
               <h2 className="text-2xl font-bold text-white mb-1 leading-snug">
                 What are you building toward?
@@ -340,7 +369,7 @@ function DarkroomIDContent() {
           )}
 
           {/* Screen 2: Loading + Results */}
-          {step === 2 && (
+          {!showWaitlist && step === 2 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
 
               {/* Loading / error state */}
