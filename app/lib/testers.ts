@@ -19,6 +19,7 @@ export const APPROVED_TESTERS = [
   "autheo_network",
   "0xgodzubby",
   "z0renx",
+  "minacryptocom",
 
 
 
