@@ -18,6 +18,7 @@ export const APPROVED_TESTERS = [
   "rufus1eth",
   "Autheo_Network",
   "0xgodzubby",
+  "z0renX",
 
 
 
