@@ -15,6 +15,9 @@ export const APPROVED_TESTERS = [
   "mykel_aGain",
   "Wendy_rohsee",
   "xcryptopunk",
+  "rufus1eth",
+  "Autheo_Network",
+  
 
 ];
 
