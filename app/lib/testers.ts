@@ -17,7 +17,9 @@ export const APPROVED_TESTERS = [
   "xcryptopunk",
   "rufus1eth",
   "Autheo_Network",
+  "0xgodzubby",
   
+
 
 ];
 

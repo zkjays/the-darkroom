@@ -4,7 +4,7 @@ export default function Hero() {
   return (
     <section className="flex min-h-[calc(100vh-80px)] items-center justify-center px-6 text-center">
       <div className="mx-auto max-w-3xl">
-        <p className="mb-8 font-[family-name:var(--font-mono)] text-xs tracking-[0.3em] text-white/30 uppercase">
+        <p className="mb-8 font-mono text-xs tracking-[0.3em] text-white/30 uppercase">
           where the real work happens
         </p>
 
@@ -30,7 +30,7 @@ export default function Hero() {
           </Link>
         </div>
 
-        <p className="mt-4 font-[family-name:var(--font-mono)] text-[11px] tracking-[0.15em] text-white/20 uppercase">
+        <p className="mt-4 font-mono text-[11px] tracking-[0.15em] text-white/20 uppercase">
           60 seconds · no data stored
         </p>
       </div>
