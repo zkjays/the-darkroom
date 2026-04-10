@@ -11,14 +11,14 @@ export const APPROVED_TESTERS = [
   "jim_buildr",
   "rb_investor45",
   "pixassohq",
-  "Wickedgene_",
-  "mykel_aGain",
-  "Wendy_rohsee",
+  "wickedgene_",
+  "mykel_again",
+  "wendy_rohsee",
   "xcryptopunk",
   "rufus1eth",
-  "Autheo_Network",
+  "autheo_network",
   "0xgodzubby",
-  "z0renX",
+  "z0renx",
 
 
 
