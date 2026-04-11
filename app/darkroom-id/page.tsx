@@ -94,6 +94,9 @@ function DarkroomIDContent() {
   const [cooldownDays, setCooldownDays] = useState(0);
   const [referrerHandle, setReferrerHandle] = useState<string | null>(null);
   const [showWaitlist, setShowWaitlist] = useState(false);
+  const [showAlreadyClaimed, setShowAlreadyClaimed] = useState(false);
+  const [alreadyClaimedDays, setAlreadyClaimedDays] = useState(0);
+  const [checkingHandle, setCheckingHandle] = useState(false);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -105,6 +108,29 @@ function DarkroomIDContent() {
   const goTo = (next: number) => {
     setVisible(false);
     setTimeout(() => { setStep(next); setVisible(true); }, 300);
+  };
+
+  const handleContinue = async () => {
+    if (answers.handle.length < 2 || checkingHandle) return;
+    if (!isTester(answers.handle)) {
+      setShowWaitlist(true);
+      return;
+    }
+    setCheckingHandle(true);
+    try {
+      const res = await fetch(`/api/check-claim?handle=${encodeURIComponent(answers.handle)}`);
+      const data = await res.json();
+      if (data.already_claimed && data.days_until_reclaim > 0) {
+        setAlreadyClaimedDays(data.days_until_reclaim);
+        setShowAlreadyClaimed(true);
+        return;
+      }
+    } catch {
+      // If check fails, allow them to proceed
+    } finally {
+      setCheckingHandle(false);
+    }
+    goTo(1);
   };
 
   const toggleGoal = (value: string) => {
@@ -251,6 +277,38 @@ function DarkroomIDContent() {
       <main className="flex min-h-screen items-center justify-center px-6 pt-24 pb-16">
         <div className="w-full max-w-md">
 
+          {/* Already claimed screen */}
+          {showAlreadyClaimed && (
+            <div className="flex flex-col items-center text-center gap-5">
+              <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.3em] text-slate-400 uppercase">
+                Already claimed
+              </p>
+              <h1 className="text-2xl font-bold text-white leading-snug">
+                You&apos;re already in the room.
+              </h1>
+              <p className="text-slate-300 text-sm leading-relaxed max-w-xs">
+                You&apos;ve already claimed your Darkroom ID. Reclaim available in {alreadyClaimedDays} day{alreadyClaimedDays !== 1 ? "s" : ""}.
+              </p>
+              <p className="font-[family-name:var(--font-mono)] text-sm text-slate-200">
+                @{answers.handle}
+              </p>
+              <div className="flex flex-col gap-3 w-full">
+                <button
+                  onClick={() => { localStorage.setItem("darkroom_handle", answers.handle); router.push("/dashboard"); }}
+                  className="w-full rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)]"
+                >
+                  Go to Dashboard →
+                </button>
+                <button
+                  onClick={() => { setShowAlreadyClaimed(false); setAnswers((prev) => ({ ...prev, handle: "" })); }}
+                  className="rounded-xl border border-white/10 px-6 py-3 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all"
+                >
+                  Try another handle
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Waitlist screen */}
           {showWaitlist && (
             <div className="flex flex-col items-center text-center gap-5">
@@ -279,7 +337,7 @@ function DarkroomIDContent() {
           )}
 
           {/* Screen 0: Handle input */}
-          {!showWaitlist && step === 0 && (
+          {!showWaitlist && !showAlreadyClaimed && step === 0 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
               {referrerHandle && (
                 <div className="mb-6 inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-full px-4 py-1.5">
@@ -303,22 +361,22 @@ function DarkroomIDContent() {
                   placeholder="yourhandle"
                   className="flex-1 bg-transparent text-white placeholder:text-slate-500 outline-none text-sm font-[family-name:var(--font-mono)]"
                   autoFocus
-                  onKeyDown={(e) => { if (e.key === "Enter" && answers.handle.length >= 2) { if (!isTester(answers.handle)) { setShowWaitlist(true); } else { goTo(1); } } }}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleContinue(); }}
                 />
               </div>
 
               <button
-                onClick={() => { if (!isTester(answers.handle)) { setShowWaitlist(true); } else { goTo(1); } }}
-                disabled={answers.handle.length < 2}
+                onClick={handleContinue}
+                disabled={answers.handle.length < 2 || checkingHandle}
                 className="w-full rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
               >
-                Continue →
+                {checkingHandle ? "Checking…" : "Continue →"}
               </button>
             </div>
           )}
 
           {/* Screen 1: Multi-select goals */}
-          {!showWaitlist && step === 1 && (
+          {!showWaitlist && !showAlreadyClaimed && step === 1 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
               <h2 className="text-2xl font-bold text-white mb-1 leading-snug">
                 What are you building toward?
@@ -369,7 +427,7 @@ function DarkroomIDContent() {
           )}
 
           {/* Screen 2: Loading + Results */}
-          {!showWaitlist && step === 2 && (
+          {!showWaitlist && !showAlreadyClaimed && step === 2 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
 
               {/* Loading / error state */}

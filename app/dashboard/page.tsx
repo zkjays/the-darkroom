@@ -1037,7 +1037,7 @@ export default function Dashboard() {
   );
 
   const fetchDashboard = useCallback((handle: string) => {
-    fetch(`/api/dashboard?handle=${encodeURIComponent(handle)}`)
+    fetch(`/api/dashboard?handle=${encodeURIComponent(handle)}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
         if (d.error) { setNotFound(true); return; }
