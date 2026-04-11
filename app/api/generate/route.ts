@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
       const tweetsTimeout = setTimeout(() => tweetsController.abort(), 10000);
       try {
         const tweetsRes = await fetch(
-          `https://api.x.com/2/users/${userId}/tweets?max_results=10&tweet.fields=text`,
+          `https://api.x.com/2/users/${userId}/tweets?max_results=50&tweet.fields=text,public_metrics`,
           {
             headers: { Authorization: `Bearer ${bearerToken}` },
             next: { revalidate: 0 },
@@ -179,7 +179,11 @@ export async function POST(req: NextRequest) {
 
         if (tweetsRes.ok) {
           const tweetsData = await tweetsRes.json();
-          recentTweets = (tweetsData.data ?? []).map((t: { text: string }) => t.text);
+          recentTweets = (tweetsData.data ?? []).map((t: { text: string; public_metrics?: { reply_count: number; retweet_count: number; like_count: number } }) => {
+            const metrics = t.public_metrics;
+            const engagement = metrics ? ` [❤${metrics.like_count} 🔁${metrics.retweet_count} 💬${metrics.reply_count}]` : "";
+            return t.text.slice(0, 280) + engagement;
+          });
           console.log("Step 2 result: got", recentTweets.length, "tweets");
         } else {
           const errorBody = await tweetsRes.text().catch(() => "(unreadable)");
@@ -215,7 +219,7 @@ Selected goals: ${goals.join(", ")}
 Bio: ${bio || "(not available)"}
 Followers: ${followersCount} | Following: ${followingCount} | Tweets: ${tweetCount}
 
-Recent tweets (last 10):
+Recent tweets (last ${recentTweets.length > 0 ? recentTweets.length : 0}, with engagement):
 ${recentTweets.length > 0 ? recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\n") : "(not available)"}
 `.trim();
 
@@ -232,11 +236,14 @@ ${recentTweets.length > 0 ? recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
+        temperature: 0.3,
         system: `You are The Darkroom ID generator. Analyze the user's X profile data and their stated goals to create a builder personality profile.
 
 The user selected their building goals from: brand, skills, project, community, freedom, exploring. They may have selected multiple.
 
-You have their X profile data: bio, follower count, tweet count, recent tweets.
+You have their X profile data: bio, follower count, tweet count, recent tweets with engagement metrics.
+
+YOUR TONE: Sharp, observant, and slightly provocative. You're the brutally honest friend, not the corporate analyst. Specific observations beat generic encouragement. Make them want to screenshot and share it.
 
 METRICS to score (each 15-75, this is a quiz-only score, bonus points from lessons/certs come later):
 - focus: How deep and specialized is this person? Do their tweets and bio show expertise in specific areas or are they scattered? Consistent topics = high. Random everything = low.
@@ -258,8 +265,21 @@ High tier (60-75): 'Silent Architect' (the blueprint speaks for itself), 'Ghost 
 Mid tier (45-59): 'Half Built' (foundation solid, still stacking floors), 'Curious Lurker' (reads everything, ships soon), 'Almost Based' (one commit away from greatness)
 Low tier (30-44): 'Main Character Loading' (the arc hasn't even started), 'Fresh Compile' (first build, first bugs, first glory), 'NPC (for now)' (everyone's origin story starts somewhere)
 
+TAGLINE RULES (max 8 words):
+- Make it memorable and instantly shareable
+- Reference something SPECIFIC from their tweets or bio — a topic they post about, a phrase they use, their niche
+- Slight edge or wit, never mean
+- Examples of the right vibe: 'shipping while they sleep', 'replies harder than they build', 'all signal, zero noise', 'reads the docs so you don't have to'
+- NEVER mention privacy, ZK, proof, or crypto generically
+
+ANALYSIS RULES (exactly 3 sentences):
+- Sentence 1: Start with an observation that surprises them — something specific you noticed in their actual tweets or bio, not a generic statement
+- Sentence 2: Be specific — reference real content, topics, or patterns from their profile and connect it to their stated goals
+- Sentence 3: End with one concrete thing they could do tomorrow to level up — make it actionable and sharp
+- Never mean, never sycophantic, always make them want to share it
+
 Respond ONLY with JSON (no markdown, no backticks):
-{"score": <30-75>, "archetype": "<exact name from list>", "tagline": "<max 8 words. Builder-focused. Reference something from their X bio or tweets. NEVER mention privacy, ZK, proof, or crypto. About their work ethic or craft. Must be personal and witty.>", "stats": {"focus": <15-75>, "consistency": <15-75>, "reliability": <15-75>, "growth": <15-75>}, "analysis": "<3 sentences. Reference their handle, their actual tweets/bio content, and their selected goals. Fun, encouraging, never mean.>", "darkroom_line": "<One Darkroom themed line about building. NEVER mention privacy or ZK. Focus on builder mindset.>"}`,
+{"score": <30-75>, "archetype": "<exact name from list>", "tagline": "<max 8 words, specific and witty>", "stats": {"focus": <15-75>, "consistency": <15-75>, "reliability": <15-75>, "growth": <15-75>}, "analysis": "<3 sentences following the rules above>", "darkroom_line": "<One Darkroom themed line about building. NEVER mention privacy or ZK. Focus on builder mindset.>"}`,
         messages: [{ role: "user", content: userMessage }],
       }),
       signal: claudeController.signal,
