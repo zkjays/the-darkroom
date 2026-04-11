@@ -117,7 +117,8 @@ export async function POST(req: NextRequest) {
   let followersCount = 0;
   let followingCount = 0;
   let tweetCount = 0;
-  let recentTweets: string[] = [];
+  let originalTweets: string[] = [];
+  let replyTweets: string[] = [];
   let userId = "";
   let profileImageUrl = "";
 
@@ -163,38 +164,66 @@ export async function POST(req: NextRequest) {
     }
 
     if (userId) {
-      console.log("Step 2: Fetching tweets for userId", userId);
-      const tweetsController = new AbortController();
-      const tweetsTimeout = setTimeout(() => tweetsController.abort(), 10000);
-      try {
-        const tweetsRes = await fetch(
-          `https://api.x.com/2/users/${userId}/tweets?max_results=50&tweet.fields=text,public_metrics`,
-          {
-            headers: { Authorization: `Bearer ${bearerToken}` },
-            next: { revalidate: 0 },
-            signal: tweetsController.signal,
-          }
-        );
-        clearTimeout(tweetsTimeout);
+      type TweetRaw = { text: string; public_metrics?: { reply_count: number; retweet_count: number; like_count: number } };
+      const formatTweet = (t: TweetRaw) => {
+        const m = t.public_metrics;
+        const e = m ? ` [❤${m.like_count} 🔁${m.retweet_count} 💬${m.reply_count}]` : "";
+        return t.text.slice(0, 280) + e;
+      };
 
-        if (tweetsRes.ok) {
-          const tweetsData = await tweetsRes.json();
-          recentTweets = (tweetsData.data ?? []).map((t: { text: string; public_metrics?: { reply_count: number; retweet_count: number; like_count: number } }) => {
-            const metrics = t.public_metrics;
-            const engagement = metrics ? ` [❤${metrics.like_count} 🔁${metrics.retweet_count} 💬${metrics.reply_count}]` : "";
-            return t.text.slice(0, 280) + engagement;
-          });
-          console.log("Step 2 result: got", recentTweets.length, "tweets");
+      // Step 2a: original tweets only (no replies/retweets)
+      console.log("Step 2a: Fetching original tweets for userId", userId);
+      const origController = new AbortController();
+      const origTimeout = setTimeout(() => origController.abort(), 10000);
+      try {
+        const origRes = await fetch(
+          `https://api.x.com/2/users/${userId}/tweets?max_results=30&exclude=replies,retweets&tweet.fields=text,public_metrics`,
+          { headers: { Authorization: `Bearer ${bearerToken}` }, next: { revalidate: 0 }, signal: origController.signal }
+        );
+        clearTimeout(origTimeout);
+        if (origRes.ok) {
+          const d = await origRes.json();
+          originalTweets = (d.data ?? []).map(formatTweet);
+          console.log("Step 2a result: got", originalTweets.length, "original tweets");
         } else {
-          const errorBody = await tweetsRes.text().catch(() => "(unreadable)");
-          console.log("Step 2: tweets fetch failed —", tweetsRes.status, errorBody);
-          warnings.push(`x_tweets_failed: Could not fetch recent tweets (${tweetsRes.status})`);
+          const errorBody = await origRes.text().catch(() => "(unreadable)");
+          console.log("Step 2a: failed —", origRes.status, errorBody);
+          warnings.push(`x_tweets_failed: Could not fetch original tweets (${origRes.status})`);
         }
       } catch (e) {
-        clearTimeout(tweetsTimeout);
-        const reason = e instanceof Error && e.name === "AbortError" ? "Tweets request timed out" : "Could not fetch recent tweets";
-        console.log("Step 2: exception —", reason, e);
+        clearTimeout(origTimeout);
+        const reason = e instanceof Error && e.name === "AbortError" ? "Original tweets request timed out" : "Could not fetch original tweets";
+        console.log("Step 2a: exception —", reason, e);
         warnings.push(`x_tweets_failed: ${reason}`);
+      }
+
+      // Step 2b: all tweets including replies (to isolate reply behavior)
+      console.log("Step 2b: Fetching replies for userId", userId);
+      const repliesController = new AbortController();
+      const repliesTimeout = setTimeout(() => repliesController.abort(), 10000);
+      try {
+        const repliesRes = await fetch(
+          `https://api.x.com/2/users/${userId}/tweets?max_results=30&tweet.fields=text,public_metrics`,
+          { headers: { Authorization: `Bearer ${bearerToken}` }, next: { revalidate: 0 }, signal: repliesController.signal }
+        );
+        clearTimeout(repliesTimeout);
+        if (repliesRes.ok) {
+          const d = await repliesRes.json();
+          const all: string[] = (d.data ?? []).map(formatTweet);
+          // replies = full timeline minus originals
+          const origSet = new Set(originalTweets);
+          replyTweets = all.filter((t) => !origSet.has(t));
+          console.log("Step 2b result: got", replyTweets.length, "replies");
+        } else {
+          const errorBody = await repliesRes.text().catch(() => "(unreadable)");
+          console.log("Step 2b: failed —", repliesRes.status, errorBody);
+          warnings.push(`x_replies_failed: Could not fetch replies (${repliesRes.status})`);
+        }
+      } catch (e) {
+        clearTimeout(repliesTimeout);
+        const reason = e instanceof Error && e.name === "AbortError" ? "Replies request timed out" : "Could not fetch replies";
+        console.log("Step 2b: exception —", reason, e);
+        warnings.push(`x_replies_failed: ${reason}`);
       }
     } else {
       console.log("Step 2: skipped — userId is empty (Step 1 likely failed)");
@@ -211,16 +240,19 @@ export async function POST(req: NextRequest) {
   }
 
   console.log("Step 3: Calling Claude API");
-  console.log("Sending to Claude:", JSON.stringify({ handle, goals, bio, followers: followersCount, tweetCount: recentTweets.length }));
+  console.log("Sending to Claude:", JSON.stringify({ handle, goals, bio, followers: followersCount, originalTweets: originalTweets.length, replyTweets: replyTweets.length }));
 
   const userMessage = `
 Handle: @${handle}
 Selected goals: ${goals.join(", ")}
 Bio: ${bio || "(not available)"}
-Followers: ${followersCount} | Following: ${followingCount} | Tweets: ${tweetCount}
+Followers: ${followersCount} | Following: ${followingCount} | Total tweets: ${tweetCount}
 
-Recent tweets (last ${recentTweets.length > 0 ? recentTweets.length : 0}, with engagement):
-${recentTweets.length > 0 ? recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\n") : "(not available)"}
+--- ORIGINAL TWEETS (${originalTweets.length}, excludes replies/retweets) ---
+${originalTweets.length > 0 ? originalTweets.map((t, i) => `${i + 1}. ${t}`).join("\n") : "(none available)"}
+
+--- REPLIES (${replyTweets.length}, their engagement with others) ---
+${replyTweets.length > 0 ? replyTweets.map((t, i) => `${i + 1}. ${t}`).join("\n") : "(none available)"}
 `.trim();
 
   const claudeController = new AbortController();
@@ -241,7 +273,27 @@ ${recentTweets.length > 0 ? recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\
 
 The user selected their building goals from: brand, skills, project, community, freedom, exploring. They may have selected multiple.
 
-You have their X profile data: bio, follower count, tweet count, recent tweets with engagement metrics.
+You receive two sets of tweets: ORIGINAL TWEETS (what they post themselves) and REPLIES (how they engage with others). Don't just count them — analyze the SUBSTANCE.
+
+For ORIGINAL TWEETS, assess:
+- Are they about building, shipping, learning? → high signal
+- Are they shitposts, gms, generic motivational content? → low signal
+- Do they share work, links, projects, technical insights? → very high signal
+- Length and depth — long thoughtful tweets beat one-liners
+
+For REPLIES, assess:
+- Are they substantive (insights, questions, helping others)? → high reliability
+- Are they 'gm', 'lfg', 'this', 'agree', 'based'? → low signal noise
+- Do they show technical knowledge or genuine engagement? → high signal
+- A user with 100 'gm' replies has very different reliability than one with 20 thoughtful replies
+
+QUALITY OVER QUANTITY: A user with 5 substantive original tweets about their build is MORE of a builder than someone with 50 motivational tweets. A user with 10 deep replies is MORE reliable than someone with 100 'gm' replies. Volume without substance means low scores.
+
+SCORING GUIDANCE:
+- High focus: original tweets are about specific topics, deep, technical, consistent subject matter
+- High reliability: replies show real engagement — questions, help, insights — not noise
+- High growth: original content quality improving, learning in public, teaching others
+- High consistency: regular substantive activity, not sporadic bursts of fluff
 
 YOUR TONE: A robot mentor that roasts with love. Sharp and observational, slightly ironic, but always opening a door. You're the friend who tells them the truth BECAUSE you believe in them. The user should finish reading feeling SEEN and READY — not deflated. Specific beats generic. Warmth beats cruelty. Avoid: "fails", "lacks", "weak", "poor". Use: "potential", "could", "next step", "the gap is", "ready to".
 
