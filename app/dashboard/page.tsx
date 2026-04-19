@@ -204,11 +204,11 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
 }
 
 function StatCard({
-  statKey, label, value, color = "#ffffff", expanded, onToggle, statXp, totalScore,
+  statKey, label, value, color = "#ffffff", expanded, onToggle, statXp, totalScore, cardCls,
 }: {
   statKey: string; label: string; value: number; color?: string;
   expanded: boolean; onToggle: () => void;
-  statXp?: number; totalScore?: number;
+  statXp?: number; totalScore?: number; cardCls?: string;
 }) {
   const cfg = statConfig[statKey] ?? { improvements: [] };
   const stat = STATS.find((s) => s.key === statKey);
@@ -224,10 +224,12 @@ function StatCard({
     if (contentRef.current) setHeight(expanded ? contentRef.current.scrollHeight : 0);
   }, [expanded]);
 
+  const baseCls = cardCls ?? "bg-white/[0.02] border border-white/[0.06]";
+
   return (
     <div
-      className={`bg-white/[0.02] border rounded-xl p-5 lg:p-7 flex flex-col gap-3 cursor-pointer select-none transition-all duration-200 ${
-        expanded ? "border-white/[0.12] bg-white/[0.04]" : "border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.1]"
+      className={`${baseCls} rounded-xl p-5 lg:p-7 flex flex-col gap-3 cursor-pointer select-none transition-all duration-200 ${
+        expanded ? "ring-1 ring-white/10" : "hover:ring-1 hover:ring-white/5"
       }`}
       onClick={onToggle}
     >
@@ -1018,6 +1020,45 @@ function DailyGoals({
   );
 }
 
+// ── CARD STYLE SYSTEM ──────────────────────────────────────────────────────
+interface CardStyles {
+  primaryCard: string;
+  scoreCard:   string;
+  nestedCard:  string;
+  tabActive:   string;
+}
+
+const CARD_STYLE_MAP: Record<string, CardStyles> = {
+  cyan: {
+    primaryCard: "bg-gradient-to-br from-cyan-950/20 to-[#0c0c14] border border-cyan-500/[0.08]",
+    scoreCard:   "bg-gradient-to-b from-cyan-950/30 to-[#0c0c14] border border-cyan-500/[0.1]",
+    nestedCard:  "bg-[#12121e] border border-white/[0.06]",
+    tabActive:   "border-cyan-400",
+  },
+  violet: {
+    primaryCard: "bg-gradient-to-br from-violet-950/20 to-[#0c0c14] border border-violet-500/[0.08]",
+    scoreCard:   "bg-gradient-to-b from-violet-950/30 to-[#0c0c14] border border-violet-500/[0.1]",
+    nestedCard:  "bg-[#12121e] border border-white/[0.06]",
+    tabActive:   "border-violet-400",
+  },
+  emerald: {
+    primaryCard: "bg-gradient-to-br from-emerald-950/20 to-[#0c0c14] border border-emerald-500/[0.08]",
+    scoreCard:   "bg-gradient-to-b from-emerald-950/30 to-[#0c0c14] border border-emerald-500/[0.1]",
+    nestedCard:  "bg-[#12121e] border border-white/[0.06]",
+    tabActive:   "border-emerald-400",
+  },
+  amber: {
+    primaryCard: "bg-gradient-to-br from-amber-950/20 to-[#0c0c14] border border-amber-500/[0.08]",
+    scoreCard:   "bg-gradient-to-b from-amber-950/30 to-[#0c0c14] border border-amber-500/[0.1]",
+    nestedCard:  "bg-[#12121e] border border-white/[0.06]",
+    tabActive:   "border-amber-400",
+  },
+};
+
+function getCardStyle(accent: string): CardStyles {
+  return CARD_STYLE_MAP[accent] ?? CARD_STYLE_MAP.cyan;
+}
+
 const TABS = [
   { id: "id", label: "ID" },
   { id: "work", label: "Work" },
@@ -1028,13 +1069,15 @@ type TabId = typeof TABS[number]["id"];
 
 // ── WORK TAB ───────────────────────────────────────────────────────────────
 function WorkTab({
-  handle, goalsPublic, accentClass, onXPGained,
+  handle, goalsPublic, accentClass, accent, onXPGained,
 }: {
   handle: string;
   goalsPublic: boolean;
   accentClass: string;
+  accent: string;
   onXPGained: (xp: { xp_added: number; points_gained: number; xp_cost: number; new_stat_xp: number }) => void;
 }) {
+  const cs = getCardStyle(accent);
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
   const [targetStat, setTargetStat] = useState<Goal["target_stat"]>("focus");
@@ -1086,7 +1129,7 @@ function WorkTab({
   return (
     <div className="space-y-8">
       {/* Section 1: Add Proof of Work */}
-      <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5 flex flex-col gap-4">
+      <div className={`${cs.primaryCard} rounded-xl p-5 flex flex-col gap-4`}>
         <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentClass} uppercase`}>
           Add Proof of Work
         </p>
@@ -1160,7 +1203,7 @@ function WorkTab({
             <div className="w-4 h-4 rounded-full border border-white/15 border-t-white/40 animate-spin" />
           </div>
         ) : works.length === 0 ? (
-          <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl px-5 py-8 text-center">
+          <div className={`${cs.nestedCard} rounded-xl px-5 py-8 text-center`}>
             <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
               No work submitted yet. Start building.
             </p>
@@ -1170,7 +1213,7 @@ function WorkTab({
             {works.map((w) => {
               const statDef = STATS.find((s) => s.key === w.target_stat);
               return (
-                <div key={w.id} className="bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3 flex flex-col gap-2">
+                <div key={w.id} className={`${cs.nestedCard} rounded-xl px-4 py-3 flex flex-col gap-2`}>
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-sm text-slate-200 leading-snug flex-1">{w.goal_text}</p>
                     {statDef && (
@@ -1288,6 +1331,7 @@ export default function Dashboard() {
   const bonusPoints = data.bonus_points ?? 0;
   const totalScore = data.total_score ?? data.score + bonusPoints;
   const accentCls = getAccent(accent).primary;
+  const cs = getCardStyle(accent);
   const daysLeft = daysUntilReclaim(data.updated_at);
   const canReclaim = daysLeft <= 0;
   const streak = data.streak;
@@ -1299,227 +1343,227 @@ export default function Dashboard() {
       <Toast messages={toastMessages} />
       <Navbar />
 
-      <div className="pt-14">
-        {/* ── TAB BAR ── */}
-        <div className="sticky top-14 z-40 bg-[#050508] border-b border-white/5">
-          <div className="mx-auto max-w-md flex">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? "text-white border-b-2 border-white"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
+      {/* ── TAB BAR — first thing after navbar ── */}
+      <div className="sticky top-10 z-40 bg-[#050508] border-b border-white/5 py-3 pt-14">
+        <div className="mx-auto max-w-md flex">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 flex items-center justify-center px-6 py-2 text-sm font-medium transition-all ${
+                activeTab === tab.id
+                  ? `text-white border-b-2 ${cs.tabActive}`
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
+      </div>
 
-        {/* ── TAB CONTENT ── */}
-        <main className="pb-24">
+      {/* ── TAB CONTENT ── */}
+      <main className="pb-24">
 
-          {/* ── TAB 1: ID ── */}
-          {activeTab === "id" && (
-            <div className="mx-auto max-w-4xl px-6 py-8 space-y-8">
+        {/* ── TAB 1: ID ── */}
+        {activeTab === "id" && (
+          <div className="mx-auto max-w-4xl px-6 py-8 space-y-8">
 
-              {/* Header card */}
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 flex items-center gap-5">
-                <ProfileImage url={data.profile_image_url} handle={data.handle} size={80} />
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h1 className="text-xl font-extrabold tracking-tight text-white">@{data.handle}</h1>
-                    {streak && streak.current_streak > 0 && (
-                      <span className="bg-white/[0.05] border border-white/[0.08] text-slate-300 text-xs px-2.5 py-1 rounded-full flex-shrink-0">
-                        🔥 {streak.current_streak} day streak
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-slate-200 font-semibold text-sm">{data.archetype}</p>
-                  <div className="flex items-baseline gap-1.5 mt-1">
-                    <span className="font-[family-name:var(--font-mono)] text-2xl font-bold text-white">{totalScore}</span>
-                    <span className="font-[family-name:var(--font-mono)] text-xs text-slate-500">/100</span>
-                  </div>
+            {/* Header card */}
+            <div className={`${cs.primaryCard} rounded-2xl p-6 flex items-center gap-5`}>
+              <ProfileImage url={data.profile_image_url} handle={data.handle} size={80} />
+              <div className="flex flex-col gap-1 min-w-0 flex-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-xl font-extrabold tracking-tight text-white">@{data.handle}</h1>
+                  {streak && streak.current_streak > 0 && (
+                    <span className="bg-white/[0.05] border border-white/[0.08] text-slate-300 text-xs px-2.5 py-1 rounded-full flex-shrink-0">
+                      🔥 {streak.current_streak} day streak
+                    </span>
+                  )}
+                </div>
+                <p className="text-slate-200 font-semibold text-sm">{data.archetype}</p>
+                <div className="flex items-baseline gap-1.5 mt-1">
+                  <span className="font-[family-name:var(--font-mono)] text-2xl font-bold text-white">{totalScore}</span>
+                  <span className="font-[family-name:var(--font-mono)] text-xs text-slate-500">/100</span>
                 </div>
               </div>
+            </div>
 
-              {/* Score overview */}
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6 text-center flex flex-col gap-2">
-                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase`}>
-                  Darkroom Score
+            {/* Score overview */}
+            <div className={`${cs.scoreCard} rounded-xl p-6 text-center flex flex-col gap-2`}>
+              <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase`}>
+                Darkroom Score
+              </p>
+              <div className="font-[family-name:var(--font-mono)] text-[72px] lg:text-[96px] font-bold leading-none text-white">
+                {totalScore}
+              </div>
+              {bonusPoints > 0 ? (
+                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
+                  Base: {data.score} + Bonus: {bonusPoints}
                 </p>
-                <div className="font-[family-name:var(--font-mono)] text-[72px] lg:text-[96px] font-bold leading-none text-white">
-                  {totalScore}
-                </div>
-                {bonusPoints > 0 ? (
-                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
-                    Base: {data.score} + Bonus: {bonusPoints}
-                  </p>
-                ) : (
-                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
-                    Base score · up to +25 pts from lessons &amp; certs
-                  </p>
-                )}
-                {(data.total_xp ?? 0) > 0 && (
-                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
-                    {data.total_xp} XP earned total
-                  </p>
-                )}
-                <div className="mt-3 text-lg font-extrabold tracking-tight text-white">{data.archetype}</div>
-                <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-white/45 uppercase">{data.tagline}</p>
-              </div>
+              ) : (
+                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
+                  Base score · up to +25 pts from lessons &amp; certs
+                </p>
+              )}
+              {(data.total_xp ?? 0) > 0 && (
+                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
+                  {data.total_xp} XP earned total
+                </p>
+              )}
+              <div className="mt-3 text-lg font-extrabold tracking-tight text-white">{data.archetype}</div>
+              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-white/45 uppercase">{data.tagline}</p>
+            </div>
 
-              {/* Stat cards */}
-              <div>
-                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Stats</p>
-                <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 mb-3">Tap a stat to expand</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                  {(() => {
-                    const s = (data.stats ?? {}) as Record<string, number>;
-                    return STATS.map((stat) => {
-                      const value = s[stat.key] ?? s[stat.fallback] ?? 0;
-                      return (
-                        <div key={stat.key} className="h-fit">
-                          <StatCard
-                            statKey={stat.key} label={stat.label} value={value} color={stat.color}
-                            expanded={expandedStat === stat.key} onToggle={() => toggleStat(stat.key)}
-                            statXp={data.stat_xp?.[stat.key] ?? 0}
-                            totalScore={totalScore}
-                          />
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-              {/* Analysis */}
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
-                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Analysis</p>
-                <p className="text-sm text-slate-200 leading-7">{data.analysis}</p>
-                <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.1em] text-slate-300 italic mt-4">{data.darkroom_line}</p>
-              </div>
-
-              {/* Card preview */}
-              <div>
-                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Your Card</p>
-                <div className="max-w-2xl">
-                  <CardGenerator
-                    handle={data.handle} score={data.score} archetype={data.archetype}
-                    tagline={data.tagline} stats={data.stats} analysis={data.analysis}
-                    darkroomLine={data.darkroom_line} profileImageUrl={data.profile_image_url}
-                  />
-                </div>
-              </div>
-
-              {/* Journey timeline */}
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
-                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-4`}>Your Journey</p>
-                <div className="flex flex-col gap-0">
-                  {Array.from({ length: data.claim_count }, (_, i) => {
-                    const isLatest = i === data.claim_count - 1;
-                    const isFirst = i === 0;
+            {/* Stat cards */}
+            <div>
+              <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Stats</p>
+              <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 mb-3">Tap a stat to expand</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                {(() => {
+                  const s = (data.stats ?? {}) as Record<string, number>;
+                  return STATS.map((stat) => {
+                    const value = s[stat.key] ?? s[stat.fallback] ?? 0;
                     return (
-                      <div key={i} className="flex items-start gap-4 relative">
-                        <div className="flex flex-col items-center">
-                          <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${isLatest ? "bg-white/60" : "bg-white/20"}`} />
-                          {i < data.claim_count - 1 && <div className="w-px flex-1 bg-white/[0.06] min-h-[28px]" />}
-                        </div>
-                        <div className="pb-4">
-                          <p className="text-sm text-white font-medium">
-                            Claim #{i + 1}
-                            {isLatest && data.claim_count > 1 && <span className="ml-2 text-xs text-slate-400">(latest)</span>}
-                          </p>
-                          <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400 mt-0.5">
-                            {isFirst ? claimDate : formatDate(data)} · Score {data.score}
-                          </p>
-                        </div>
+                      <div key={stat.key} className="h-fit">
+                        <StatCard
+                          statKey={stat.key} label={stat.label} value={value} color={stat.color}
+                          expanded={expandedStat === stat.key} onToggle={() => toggleStat(stat.key)}
+                          statXp={data.stat_xp?.[stat.key] ?? 0}
+                          totalScore={totalScore}
+                          cardCls={cs.primaryCard}
+                        />
                       </div>
                     );
-                  })}
-                  <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-white/[0.05]">
-                    {[{ label: "Lessons completed", value: "0" }, { label: "Certifications earned", value: "0" }].map(({ label, value }) => (
-                      <div key={label} className="flex justify-between items-center opacity-40">
-                        <span className="text-xs text-slate-300">{label}</span>
-                        <span className="font-[family-name:var(--font-mono)] text-xs text-slate-400">{value}</span>
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* Analysis */}
+            <div className={`${cs.primaryCard} rounded-xl p-5`}>
+              <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Analysis</p>
+              <p className="text-sm text-slate-200 leading-7">{data.analysis}</p>
+              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.1em] text-slate-300 italic mt-4">{data.darkroom_line}</p>
+            </div>
+
+            {/* Card preview */}
+            <div>
+              <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Your Card</p>
+              <div className="max-w-2xl">
+                <CardGenerator
+                  handle={data.handle} score={data.score} archetype={data.archetype}
+                  tagline={data.tagline} stats={data.stats} analysis={data.analysis}
+                  darkroomLine={data.darkroom_line} profileImageUrl={data.profile_image_url}
+                />
+              </div>
+            </div>
+
+            {/* Journey timeline */}
+            <div className={`${cs.primaryCard} rounded-xl p-5`}>
+              <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-4`}>Your Journey</p>
+              <div className="flex flex-col gap-0">
+                {Array.from({ length: data.claim_count }, (_, i) => {
+                  const isLatest = i === data.claim_count - 1;
+                  const isFirst = i === 0;
+                  return (
+                    <div key={i} className="flex items-start gap-4 relative">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${isLatest ? "bg-white/60" : "bg-white/20"}`} />
+                        {i < data.claim_count - 1 && <div className="w-px flex-1 bg-white/[0.06] min-h-[28px]" />}
                       </div>
-                    ))}
-                  </div>
+                      <div className="pb-4">
+                        <p className="text-sm text-white font-medium">
+                          Claim #{i + 1}
+                          {isLatest && data.claim_count > 1 && <span className="ml-2 text-xs text-slate-400">(latest)</span>}
+                        </p>
+                        <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400 mt-0.5">
+                          {isFirst ? claimDate : formatDate(data)} · Score {data.score}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-white/[0.05]">
+                  {[{ label: "Lessons completed", value: "0" }, { label: "Certifications earned", value: "0" }].map(({ label, value }) => (
+                    <div key={label} className="flex justify-between items-center opacity-40">
+                      <span className="text-xs text-slate-300">{label}</span>
+                      <span className="font-[family-name:var(--font-mono)] text-xs text-slate-400">{value}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              {/* Coming soon */}
-              <div className="border border-white/[0.04] rounded-xl px-5 py-4 text-center">
-                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
-                  Lessons &amp; Certifications coming soon.
-                </p>
-                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 mt-1">
-                  Your score has room to grow. Stay in The Darkroom.
-                </p>
-              </div>
             </div>
-          )}
 
-          {/* ── TAB 2: WORK ── */}
-          {activeTab === "work" && (
-            <div className="mx-auto max-w-4xl px-6 py-8">
-              <WorkTab
-                handle={data.handle}
-                goalsPublic={goalsPublic}
-                accentClass={accentCls}
-                onXPGained={handleXPGained}
-              />
+            {/* Coming soon */}
+            <div className={`${cs.nestedCard} rounded-xl px-5 py-4 text-center`}>
+              <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
+                Lessons &amp; Certifications coming soon.
+              </p>
+              <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 mt-1">
+                Your score has room to grow. Stay in The Darkroom.
+              </p>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* ── TAB 3: SETTINGS ── */}
-          {activeTab === "settings" && (
-            <div className="mx-auto max-w-lg px-6 py-8 space-y-6">
+        {/* ── TAB 2: WORK ── */}
+        {activeTab === "work" && (
+          <div className="mx-auto max-w-4xl px-6 py-8">
+            <WorkTab
+              handle={data.handle}
+              goalsPublic={goalsPublic}
+              accentClass={accentCls}
+              accent={accent}
+              onXPGained={handleXPGained}
+            />
+          </div>
+        )}
 
-              {profilePublic && (
-                <div className="flex items-center justify-between gap-4 bg-white/[0.02] border border-white/[0.06] rounded-xl px-5 py-3">
-                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-300">
-                    🌍 Your profile is public · <span className="text-slate-500">{profileLink}</span>
-                  </p>
-                  <button
-                    onClick={() => { copyToClipboard(profileLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
-                    className="flex-shrink-0 font-[family-name:var(--font-mono)] text-[10px] text-slate-400 hover:text-slate-200 border border-white/[0.06] hover:border-white/20 rounded-full px-3 py-1 transition-all"
-                  >
-                    {linkCopied ? "Copied!" : "Copy link"}
-                  </button>
-                </div>
-              )}
+        {/* ── TAB 3: SETTINGS ── */}
+        {activeTab === "settings" && (
+          <div className="mx-auto max-w-lg px-6 py-8 space-y-6">
 
-              <SettingsPanel
-                handle={data.handle}
-                initial={{ profile_public: profilePublic, goals_public: goalsPublic, theme_accent: accent }}
-                onSaved={(s) => { setProfilePublic(s.profile_public); setGoalsPublic(s.goals_public); setAccent(s.theme_accent); }}
-                onAccentChange={setAccent}
-              />
-
-              {canReclaim ? (
-                <button onClick={() => router.push("/darkroom-id")}
-                  className="w-full rounded-xl border border-white/10 px-5 py-3 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all">
-                  Reclaim ID →
+            {profilePublic && (
+              <div className={`${cs.nestedCard} flex items-center justify-between gap-4 rounded-xl px-5 py-3`}>
+                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-300">
+                  🌍 Your profile is public · <span className="text-slate-500">{profileLink}</span>
+                </p>
+                <button
+                  onClick={() => { copyToClipboard(profileLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
+                  className="flex-shrink-0 font-[family-name:var(--font-mono)] text-[10px] text-slate-400 hover:text-slate-200 border border-white/[0.06] hover:border-white/20 rounded-full px-3 py-1 transition-all"
+                >
+                  {linkCopied ? "Copied!" : "Copy link"}
                 </button>
-              ) : (
-                <div className="w-full rounded-xl border border-white/[0.05] px-5 py-3 text-sm text-slate-500 text-center cursor-not-allowed select-none">
-                  Reclaim in {daysLeft} day{daysLeft !== 1 ? "s" : ""}
-                </div>
-              )}
+              </div>
+            )}
 
-              <button onClick={disconnect}
-                className="w-full text-xs text-slate-500 hover:text-slate-300 transition-colors text-center py-2">
-                Disconnect
+            <SettingsPanel
+              handle={data.handle}
+              initial={{ profile_public: profilePublic, goals_public: goalsPublic, theme_accent: accent }}
+              onSaved={(s) => { setProfilePublic(s.profile_public); setGoalsPublic(s.goals_public); setAccent(s.theme_accent); }}
+              onAccentChange={setAccent}
+            />
+
+            {canReclaim ? (
+              <button onClick={() => router.push("/darkroom-id")}
+                className="w-full rounded-xl border border-white/10 px-5 py-3 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all">
+                Reclaim ID →
               </button>
-            </div>
-          )}
+            ) : (
+              <div className="w-full rounded-xl border border-white/[0.05] px-5 py-3 text-sm text-slate-500 text-center cursor-not-allowed select-none">
+                Reclaim in {daysLeft} day{daysLeft !== 1 ? "s" : ""}
+              </div>
+            )}
 
-        </main>
-      </div>
+            <button onClick={disconnect}
+              className="w-full text-xs text-slate-500 hover:text-slate-300 transition-colors text-center py-2">
+              Disconnect
+            </button>
+          </div>
+        )}
+
+      </main>
     </div>
   );
 }
