@@ -1018,6 +1018,14 @@ function DailyGoals({
   );
 }
 
+const TABS = [
+  { id: "id", label: "ID", icon: "🪪" },
+  { id: "tasks", label: "Tasks", icon: "🎯" },
+  { id: "settings", label: "Settings", icon: "⚙️" },
+] as const;
+
+type TabId = typeof TABS[number]["id"];
+
 // ── MAIN PAGE ──────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const router = useRouter();
@@ -1025,7 +1033,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [expandedStat, setExpandedStat] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("id");
   const [profilePublic, setProfilePublic] = useState(false);
   const [goalsPublic, setGoalsPublic] = useState(false);
   const [accent, setAccent] = useState("cyan");
@@ -1111,201 +1119,247 @@ export default function Dashboard() {
       <Toast messages={toastMessages} />
       <Navbar />
 
-      <main className="mx-auto max-w-6xl px-6 sm:px-8 lg:px-12 pt-28 pb-24 flex flex-col gap-8 lg:gap-12">
-
-        {/* ── PUBLIC PROFILE BANNER ── */}
-        {profilePublic && (
-          <div className="flex items-center justify-between gap-4 bg-white/[0.02] border border-white/[0.06] rounded-xl px-5 py-3">
-            <p className="font-[family-name:var(--font-mono)] text-xs text-slate-300">
-              🌍 Your profile is public · <span className="text-slate-500">{profileLink}</span>
-            </p>
-            <button
-              onClick={() => { copyToClipboard(profileLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
-              className="flex-shrink-0 font-[family-name:var(--font-mono)] text-[10px] text-slate-400 hover:text-slate-200 border border-white/[0.06] hover:border-white/20 rounded-full px-3 py-1 transition-all"
-            >
-              {linkCopied ? "Copied!" : "Copy link"}
-            </button>
-          </div>
-        )}
-
-        {/* ── A) HEADER CARD ── */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 flex items-center gap-5">
-          <ProfileImage url={data.profile_image_url} handle={data.handle} size={80} />
-          <div className="flex flex-col gap-1 min-w-0 flex-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl font-extrabold tracking-tight text-white">@{data.handle}</h1>
+      <div className="pt-14">
+        {/* ── COMPACT PERSISTENT HEADER ── */}
+        <div className="bg-white/[0.02] border-b border-white/5">
+          <div className="mx-auto max-w-4xl px-6 py-3 flex items-center gap-3">
+            <ProfileImage url={data.profile_image_url} handle={data.handle} size={40} />
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="font-bold text-white text-sm">@{data.handle}</span>
               {streak && streak.current_streak > 0 && (
-                <span className="bg-white/[0.05] border border-white/[0.08] text-slate-300 text-xs px-2.5 py-1 rounded-full flex-shrink-0">
-                  🔥 {streak.current_streak} day streak
+                <span className="bg-white/[0.05] border border-white/[0.08] text-slate-300 text-xs px-2 py-0.5 rounded-full flex-shrink-0">
+                  🔥 {streak.current_streak}
                 </span>
               )}
-              <button
-                onClick={() => setShowSettings((v) => !v)}
-                className="ml-auto font-[family-name:var(--font-mono)] text-[10px] text-slate-500 hover:text-slate-300 border border-white/[0.06] hover:border-white/[0.1] rounded-full px-3 py-1 transition-all flex-shrink-0"
-              >
-                ⚙ Settings
-              </button>
             </div>
-            <p className="text-slate-200 font-semibold text-sm">{data.archetype}</p>
-            <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="font-[family-name:var(--font-mono)] text-2xl font-bold text-white">{totalScore}</span>
+            <div className="flex items-baseline gap-1 flex-shrink-0">
+              <span className="font-[family-name:var(--font-mono)] text-lg font-bold text-white">{totalScore}</span>
               <span className="font-[family-name:var(--font-mono)] text-xs text-slate-500">/100</span>
             </div>
           </div>
         </div>
 
-        {/* ── SETTINGS PANEL (collapsible) ── */}
-        {showSettings && (
-          <SettingsPanel
-            handle={data.handle}
-            initial={{ profile_public: profilePublic, goals_public: goalsPublic, theme_accent: accent }}
-            onSaved={(s) => { setProfilePublic(s.profile_public); setGoalsPublic(s.goals_public); setAccent(s.theme_accent); }}
-            onAccentChange={setAccent}
-          />
-        )}
-
-        {/* ── B) SCORE OVERVIEW ── */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6 text-center flex flex-col gap-2">
-          <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase`}>
-            Darkroom Score
-          </p>
-          <div className="font-[family-name:var(--font-mono)] text-[72px] lg:text-[96px] font-bold leading-none text-white">
-            {totalScore}
+        {/* ── TAB BAR ── */}
+        <div className="sticky top-14 z-40 bg-[#050508] border-b border-white/5">
+          <div className="mx-auto max-w-md flex">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium transition-all ${
+                  activeTab === tab.id
+                    ? "text-white border-b-2 border-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
           </div>
-          {bonusPoints > 0 ? (
-            <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
-              Base: {data.score} + Bonus: {bonusPoints}
-            </p>
-          ) : (
-            <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
-              Base score · up to +25 pts from lessons &amp; certs
-            </p>
-          )}
-          {(data.total_xp ?? 0) > 0 && (
-            <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
-              {data.total_xp} XP earned total
-            </p>
-          )}
-          <div className="mt-3 text-lg font-extrabold tracking-tight text-white">{data.archetype}</div>
-          <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-white/45 uppercase">{data.tagline}</p>
         </div>
 
-        {/* ── C) FOUR STAT CARDS (expandable) ── */}
-        <div>
-          <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Stats</p>
-          <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 mb-3">Tap a stat to expand</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            {(() => {
-              const s = (data.stats ?? {}) as Record<string, number>;
-              return STATS.map((stat) => {
-                const value = s[stat.key] ?? s[stat.fallback] ?? 0;
-                return (
-                  <div key={stat.key} className="h-fit">
-                    <StatCard
-                      statKey={stat.key} label={stat.label} value={value} color={stat.color}
-                      expanded={expandedStat === stat.key} onToggle={() => toggleStat(stat.key)}
-                      statXp={data.stat_xp?.[stat.key] ?? 0}
-                      totalScore={totalScore}
-                    />
+        {/* ── TAB CONTENT ── */}
+        <main className="pb-24">
+
+          {/* ── TAB 1: ID ── */}
+          {activeTab === "id" && (
+            <div className="mx-auto max-w-4xl px-6 py-8 space-y-8">
+
+              {/* Header card */}
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 flex items-center gap-5">
+                <ProfileImage url={data.profile_image_url} handle={data.handle} size={80} />
+                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h1 className="text-xl font-extrabold tracking-tight text-white">@{data.handle}</h1>
+                    {streak && streak.current_streak > 0 && (
+                      <span className="bg-white/[0.05] border border-white/[0.08] text-slate-300 text-xs px-2.5 py-1 rounded-full flex-shrink-0">
+                        🔥 {streak.current_streak} day streak
+                      </span>
+                    )}
                   </div>
-                );
-              });
-            })()}
-          </div>
-        </div>
-
-        {/* ── DAILY GOALS + TRENDING ── */}
-        <DailyGoals
-          handle={data.handle} streak={streak} defaultPublic={goalsPublic}
-          onXPGained={handleXPGained}
-          onGoalCompleted={() => fetchDashboard(data.handle)}
-          accentClass={accentCls}
-        />
-
-        {/* ── CARD PREVIEW ── */}
-        <div>
-          <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Your Card</p>
-          <div className="max-w-2xl">
-            <CardGenerator
-              handle={data.handle} score={data.score} archetype={data.archetype}
-              tagline={data.tagline} stats={data.stats} analysis={data.analysis}
-              darkroomLine={data.darkroom_line} profileImageUrl={data.profile_image_url}
-            />
-          </div>
-        </div>
-
-        {/* ── ANALYSIS ── */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
-          <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Analysis</p>
-          <p className="text-sm text-slate-200 leading-7">{data.analysis}</p>
-          <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.1em] text-slate-300 italic mt-4">{data.darkroom_line}</p>
-        </div>
-
-        {/* ── JOURNEY TIMELINE ── */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
-          <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-4`}>Your Journey</p>
-          <div className="flex flex-col gap-0">
-            {Array.from({ length: data.claim_count }, (_, i) => {
-              const isLatest = i === data.claim_count - 1;
-              const isFirst = i === 0;
-              return (
-                <div key={i} className="flex items-start gap-4 relative">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${isLatest ? "bg-white/60" : "bg-white/20"}`} />
-                    {i < data.claim_count - 1 && <div className="w-px flex-1 bg-white/[0.06] min-h-[28px]" />}
-                  </div>
-                  <div className="pb-4">
-                    <p className="text-sm text-white font-medium">
-                      Claim #{i + 1}
-                      {isLatest && data.claim_count > 1 && <span className="ml-2 text-xs text-slate-400">(latest)</span>}
-                    </p>
-                    <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400 mt-0.5">
-                      {isFirst ? claimDate : formatDate(data)} · Score {data.score}
-                    </p>
+                  <p className="text-slate-200 font-semibold text-sm">{data.archetype}</p>
+                  <div className="flex items-baseline gap-1.5 mt-1">
+                    <span className="font-[family-name:var(--font-mono)] text-2xl font-bold text-white">{totalScore}</span>
+                    <span className="font-[family-name:var(--font-mono)] text-xs text-slate-500">/100</span>
                   </div>
                 </div>
-              );
-            })}
-            <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-white/[0.05]">
-              {[{ label: "Lessons completed", value: "0" }, { label: "Certifications earned", value: "0" }].map(({ label, value }) => (
-                <div key={label} className="flex justify-between items-center opacity-40">
-                  <span className="text-xs text-slate-300">{label}</span>
-                  <span className="font-[family-name:var(--font-mono)] text-xs text-slate-400">{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+              </div>
 
-        {/* ── ACTIONS ── */}
-        <div className="flex flex-col gap-3">
-          {canReclaim ? (
-            <button onClick={() => router.push("/darkroom-id")}
-              className="w-full rounded-xl border border-white/10 px-5 py-3 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all">
-              Reclaim ID →
-            </button>
-          ) : (
-            <div className="w-full rounded-xl border border-white/[0.05] px-5 py-3 text-sm text-slate-500 text-center cursor-not-allowed select-none">
-              Reclaim in {daysLeft} day{daysLeft !== 1 ? "s" : ""}
+              {/* Score overview */}
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-6 text-center flex flex-col gap-2">
+                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase`}>
+                  Darkroom Score
+                </p>
+                <div className="font-[family-name:var(--font-mono)] text-[72px] lg:text-[96px] font-bold leading-none text-white">
+                  {totalScore}
+                </div>
+                {bonusPoints > 0 ? (
+                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
+                    Base: {data.score} + Bonus: {bonusPoints}
+                  </p>
+                ) : (
+                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
+                    Base score · up to +25 pts from lessons &amp; certs
+                  </p>
+                )}
+                {(data.total_xp ?? 0) > 0 && (
+                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
+                    {data.total_xp} XP earned total
+                  </p>
+                )}
+                <div className="mt-3 text-lg font-extrabold tracking-tight text-white">{data.archetype}</div>
+                <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-white/45 uppercase">{data.tagline}</p>
+              </div>
+
+              {/* Stat cards */}
+              <div>
+                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Stats</p>
+                <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 mb-3">Tap a stat to expand</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                  {(() => {
+                    const s = (data.stats ?? {}) as Record<string, number>;
+                    return STATS.map((stat) => {
+                      const value = s[stat.key] ?? s[stat.fallback] ?? 0;
+                      return (
+                        <div key={stat.key} className="h-fit">
+                          <StatCard
+                            statKey={stat.key} label={stat.label} value={value} color={stat.color}
+                            expanded={expandedStat === stat.key} onToggle={() => toggleStat(stat.key)}
+                            statXp={data.stat_xp?.[stat.key] ?? 0}
+                            totalScore={totalScore}
+                          />
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* Analysis */}
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
+                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Analysis</p>
+                <p className="text-sm text-slate-200 leading-7">{data.analysis}</p>
+                <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.1em] text-slate-300 italic mt-4">{data.darkroom_line}</p>
+              </div>
+
+              {/* Card preview */}
+              <div>
+                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Your Card</p>
+                <div className="max-w-2xl">
+                  <CardGenerator
+                    handle={data.handle} score={data.score} archetype={data.archetype}
+                    tagline={data.tagline} stats={data.stats} analysis={data.analysis}
+                    darkroomLine={data.darkroom_line} profileImageUrl={data.profile_image_url}
+                  />
+                </div>
+              </div>
+
+              {/* Journey timeline */}
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
+                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-4`}>Your Journey</p>
+                <div className="flex flex-col gap-0">
+                  {Array.from({ length: data.claim_count }, (_, i) => {
+                    const isLatest = i === data.claim_count - 1;
+                    const isFirst = i === 0;
+                    return (
+                      <div key={i} className="flex items-start gap-4 relative">
+                        <div className="flex flex-col items-center">
+                          <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${isLatest ? "bg-white/60" : "bg-white/20"}`} />
+                          {i < data.claim_count - 1 && <div className="w-px flex-1 bg-white/[0.06] min-h-[28px]" />}
+                        </div>
+                        <div className="pb-4">
+                          <p className="text-sm text-white font-medium">
+                            Claim #{i + 1}
+                            {isLatest && data.claim_count > 1 && <span className="ml-2 text-xs text-slate-400">(latest)</span>}
+                          </p>
+                          <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400 mt-0.5">
+                            {isFirst ? claimDate : formatDate(data)} · Score {data.score}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-white/[0.05]">
+                    {[{ label: "Lessons completed", value: "0" }, { label: "Certifications earned", value: "0" }].map(({ label, value }) => (
+                      <div key={label} className="flex justify-between items-center opacity-40">
+                        <span className="text-xs text-slate-300">{label}</span>
+                        <span className="font-[family-name:var(--font-mono)] text-xs text-slate-400">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Coming soon */}
+              <div className="border border-white/[0.04] rounded-xl px-5 py-4 text-center">
+                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
+                  Lessons &amp; Certifications coming soon.
+                </p>
+                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 mt-1">
+                  Your score has room to grow. Stay in The Darkroom.
+                </p>
+              </div>
             </div>
           )}
-          <button onClick={disconnect}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors text-center">
-            Disconnect
-          </button>
-        </div>
 
-        {/* ── COMING SOON BANNER ── */}
-        <div className="border border-white/[0.04] rounded-xl px-5 py-4 text-center">
-          <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
-            Lessons &amp; Certifications coming soon.
-          </p>
-          <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 mt-1">
-            Your score has room to grow. Stay in The Darkroom.
-          </p>
-        </div>
+          {/* ── TAB 2: TASKS ── */}
+          {activeTab === "tasks" && (
+            <div className="mx-auto max-w-4xl px-6 py-8 space-y-8">
+              <DailyGoals
+                handle={data.handle} streak={streak} defaultPublic={goalsPublic}
+                onXPGained={handleXPGained}
+                onGoalCompleted={() => fetchDashboard(data.handle)}
+                accentClass={accentCls}
+              />
+            </div>
+          )}
 
-      </main>
+          {/* ── TAB 3: SETTINGS ── */}
+          {activeTab === "settings" && (
+            <div className="mx-auto max-w-lg px-6 py-8 space-y-6">
+
+              {profilePublic && (
+                <div className="flex items-center justify-between gap-4 bg-white/[0.02] border border-white/[0.06] rounded-xl px-5 py-3">
+                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-300">
+                    🌍 Your profile is public · <span className="text-slate-500">{profileLink}</span>
+                  </p>
+                  <button
+                    onClick={() => { copyToClipboard(profileLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
+                    className="flex-shrink-0 font-[family-name:var(--font-mono)] text-[10px] text-slate-400 hover:text-slate-200 border border-white/[0.06] hover:border-white/20 rounded-full px-3 py-1 transition-all"
+                  >
+                    {linkCopied ? "Copied!" : "Copy link"}
+                  </button>
+                </div>
+              )}
+
+              <SettingsPanel
+                handle={data.handle}
+                initial={{ profile_public: profilePublic, goals_public: goalsPublic, theme_accent: accent }}
+                onSaved={(s) => { setProfilePublic(s.profile_public); setGoalsPublic(s.goals_public); setAccent(s.theme_accent); }}
+                onAccentChange={setAccent}
+              />
+
+              {canReclaim ? (
+                <button onClick={() => router.push("/darkroom-id")}
+                  className="w-full rounded-xl border border-white/10 px-5 py-3 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all">
+                  Reclaim ID →
+                </button>
+              ) : (
+                <div className="w-full rounded-xl border border-white/[0.05] px-5 py-3 text-sm text-slate-500 text-center cursor-not-allowed select-none">
+                  Reclaim in {daysLeft} day{daysLeft !== 1 ? "s" : ""}
+                </div>
+              )}
+
+              <button onClick={disconnect}
+                className="w-full text-xs text-slate-500 hover:text-slate-300 transition-colors text-center py-2">
+                Disconnect
+              </button>
+            </div>
+          )}
+
+        </main>
+      </div>
     </div>
   );
 }
