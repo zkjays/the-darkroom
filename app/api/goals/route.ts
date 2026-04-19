@@ -184,16 +184,16 @@ export async function PATCH(req: NextRequest) {
 
   if (updateError) return NextResponse.json({ error: "Failed to update goal" }, { status: 500 });
 
-  const handle: string = goal.handle;
+  const goalHandle: string = goal.handle;
   const targetStat: string = goal.target_stat ?? "focus";
 
   // Convert XP → score points via the XP system
-  const xpResult = await convertXPToPoints(db, handle, targetStat, 1);
+  const xpResult = await convertXPToPoints(db, goalHandle, targetStat, 1);
 
   // Log XP earning (non-critical — don't fail the response if this errors)
   try {
     await db.from("xp_earnings").insert({
-      handle,
+      handle: goalHandle,
       source: "goal_complete",
       amount: 1,
       meta: { goal_id, stat: targetStat, points_gained: xpResult.points_gained },
@@ -206,7 +206,7 @@ export async function PATCH(req: NextRequest) {
   const { count: completedToday } = await db
     .from("daily_goals")
     .select("*", { count: "exact", head: true })
-    .eq("handle", handle)
+    .eq("handle", goalHandle)
     .eq("goal_date", todayStr)
     .eq("status", "completed");
 
@@ -214,7 +214,7 @@ export async function PATCH(req: NextRequest) {
     const { data: streakRow } = await db
       .from("user_streaks")
       .select("*")
-      .eq("handle", handle)
+      .eq("handle", goalHandle)
       .single();
 
     const yesterday = new Date();
@@ -229,7 +229,7 @@ export async function PATCH(req: NextRequest) {
       const newLongest = Math.max(streakRow?.longest_streak ?? 0, newStreak);
       await db.from("user_streaks").upsert(
         {
-          handle,
+          handle: goalHandle,
           current_streak: newStreak,
           longest_streak: newLongest,
           last_active: todayStr,

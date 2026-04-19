@@ -1019,9 +1019,9 @@ function DailyGoals({
 }
 
 const TABS = [
-  { id: "id", label: "ID", icon: "🪪" },
-  { id: "tasks", label: "Tasks", icon: "🎯" },
-  { id: "settings", label: "Settings", icon: "⚙️" },
+  { id: "id", label: "ID" },
+  { id: "tasks", label: "Tasks" },
+  { id: "settings", label: "Settings" },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
@@ -1152,7 +1152,6 @@ export default function Dashboard() {
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
-                <span>{tab.icon}</span>
                 <span>{tab.label}</span>
               </button>
             ))}
