@@ -150,14 +150,14 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/goals — complete a goal with proof
 export async function PATCH(req: NextRequest) {
-  const { handle, goal_id, proof_value } = await req.json();
+  const { handle: authHandle, goal_id, proof_value } = await req.json();
   if (!goal_id || !proof_value) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  if (handle) {
+  if (authHandle) {
     const token = getAuthToken(req);
-    if (!(await verifyAuth(handle, token))) {
+    if (!(await verifyAuth(authHandle, token))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
