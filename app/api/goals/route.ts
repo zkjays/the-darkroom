@@ -7,13 +7,17 @@ function today() {
   return new Date().toISOString().split("T")[0];
 }
 
-// GET /api/goals?handle=X            — fetch today's goals for handle
-// GET /api/goals?handle=X&public_only=true — only public goals today
-// GET /api/goals?templates=true&limit=10   — trending public goal templates
+// GET /api/goals?handle=X                    — fetch today's goals for handle
+// GET /api/goals?handle=X&all=true           — fetch all goals (no date filter), newest first
+// GET /api/goals?handle=X&completed=true     — filter to completed only
+// GET /api/goals?handle=X&public_only=true   — only public goals today
+// GET /api/goals?templates=true&limit=10     — trending public goal templates
 export async function GET(req: NextRequest) {
   const handle = req.nextUrl.searchParams.get("handle");
   const templatesMode = req.nextUrl.searchParams.get("templates") === "true";
   const publicOnly = req.nextUrl.searchParams.get("public_only") === "true";
+  const allMode = req.nextUrl.searchParams.get("all") === "true";
+  const completedOnly = req.nextUrl.searchParams.get("completed") === "true";
   const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "10", 10);
 
   const db = getServiceSupabase();
@@ -40,12 +44,11 @@ export async function GET(req: NextRequest) {
     .from("daily_goals")
     .select("*")
     .eq("handle", handle)
-    .eq("goal_date", today())
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: allMode ? false : true });
 
-  if (publicOnly) {
-    query = query.eq("is_public", true);
-  }
+  if (!allMode) query = query.eq("goal_date", today());
+  if (publicOnly) query = query.eq("is_public", true);
+  if (completedOnly) query = query.eq("status", "completed");
 
   const { data, error } = await query;
 
@@ -54,8 +57,10 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/goals — create a new goal
+// If proof_value is provided the goal is created as immediately completed (Work tab submission).
+// Direct completions bypass the 3-goal daily limit.
 export async function POST(req: NextRequest) {
-  const { handle, goal_text, proof_type, target_stat, is_public, template_id } = await req.json();
+  const { handle, goal_text, proof_type, proof_value, target_stat, is_public, template_id } = await req.json();
 
   if (!handle || !goal_text || !proof_type || !target_stat) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -79,16 +84,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Handle not found" }, { status: 404 });
   }
 
-  // Check max 3 goals today
-  const { count } = await db
-    .from("daily_goals")
-    .select("*", { count: "exact", head: true })
-    .eq("handle", handle)
-    .eq("goal_date", today());
+  const isDirectComplete = !!proof_value;
 
-  if ((count ?? 0) >= 3) {
-    return NextResponse.json({ error: "max_goals_reached" }, { status: 400 });
+  // Enforce 3-goal daily limit only for pending goals (not direct-complete Work submissions)
+  if (!isDirectComplete) {
+    const { count } = await db
+      .from("daily_goals")
+      .select("*", { count: "exact", head: true })
+      .eq("handle", handle)
+      .eq("goal_date", today());
+
+    if ((count ?? 0) >= 3) {
+      return NextResponse.json({ error: "max_goals_reached" }, { status: 400 });
+    }
   }
+
+  const now = new Date().toISOString();
 
   const { data: goal, error: insertError } = await db
     .from("daily_goals")
@@ -96,8 +107,10 @@ export async function POST(req: NextRequest) {
       handle,
       goal_text,
       proof_type,
+      proof_value: proof_value ?? null,
       target_stat,
-      status: "pending",
+      status: isDirectComplete ? "completed" : "pending",
+      completed_at: isDirectComplete ? now : null,
       xp_reward: 1,
       goal_date: today(),
       is_public: is_public ?? false,
@@ -108,9 +121,24 @@ export async function POST(req: NextRequest) {
 
   if (insertError) return NextResponse.json({ error: "Failed to create goal" }, { status: 500 });
 
+  // If direct-complete (Work submission), run XP logic immediately
+  if (isDirectComplete && goal) {
+    const xpResult = await convertXPToPoints(db, handle, target_stat, 1);
+    try {
+      await db.from("xp_earnings").insert({
+        handle,
+        source: "goal_complete",
+        amount: 1,
+        meta: { goal_id: goal.id, stat: target_stat, points_gained: xpResult.points_gained },
+      });
+    } catch (e) {
+      console.error("xp_earnings insert failed:", e);
+    }
+    return NextResponse.json({ goal, xp: xpResult });
+  }
+
   // If copied from a template, increment that template's copy_count and award XP to creator
   if (template_id) {
-    // Increment copy_count
     const { data: templateRow } = await db
       .from("daily_goals")
       .select("handle, copy_count")
@@ -123,7 +151,6 @@ export async function POST(req: NextRequest) {
         .update({ copy_count: (templateRow.copy_count ?? 0) + 1 })
         .eq("id", template_id);
 
-      // Award 1 XP to template creator
       const { data: creatorRow } = await db
         .from("darkroom_ids")
         .select("bonus_points")
@@ -135,7 +162,6 @@ export async function POST(req: NextRequest) {
         .update({ bonus_points: (creatorRow?.bonus_points ?? 0) + 1 })
         .eq("handle", templateRow.handle);
 
-      // Log XP earning
       await db.from("xp_earnings").insert({
         handle: templateRow.handle,
         source: "template_copy",

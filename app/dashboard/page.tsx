@@ -1020,11 +1020,191 @@ function DailyGoals({
 
 const TABS = [
   { id: "id", label: "ID" },
-  { id: "tasks", label: "Tasks" },
+  { id: "work", label: "Work" },
   { id: "settings", label: "Settings" },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
+
+// ── WORK TAB ───────────────────────────────────────────────────────────────
+function WorkTab({
+  handle, goalsPublic, accentClass, onXPGained,
+}: {
+  handle: string;
+  goalsPublic: boolean;
+  accentClass: string;
+  onXPGained: (xp: { xp_added: number; points_gained: number; xp_cost: number; new_stat_xp: number }) => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [description, setDescription] = useState("");
+  const [targetStat, setTargetStat] = useState<Goal["target_stat"]>("focus");
+  const [isPublic, setIsPublic] = useState(goalsPublic);
+  const [submitting, setSubmitting] = useState(false);
+  const [works, setWorks] = useState<Goal[]>([]);
+  const [loadingWorks, setLoadingWorks] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/goals?handle=${encodeURIComponent(handle)}&all=true&completed=true`)
+      .then((r) => r.json())
+      .then((d) => setWorks(d.goals ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingWorks(false));
+  }, [handle]);
+
+  const submit = async () => {
+    if (!url.trim() || !description.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/goals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-darkroom-token": localStorage.getItem("darkroom_token") || "",
+        },
+        body: JSON.stringify({
+          handle,
+          goal_text: description,
+          proof_type: "link",
+          proof_value: url.trim(),
+          target_stat: targetStat,
+          is_public: isPublic,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to submit");
+      setWorks((prev) => [data.goal, ...prev]);
+      if (data.xp) onXPGained(data.xp);
+      setUrl("");
+      setDescription("");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to submit");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Section 1: Add Proof of Work */}
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5 flex flex-col gap-4">
+        <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentClass} uppercase`}>
+          Add Proof of Work
+        </p>
+
+        <input
+          type="url"
+          placeholder="https://github.com/..., x.com/..., youtube.com/..."
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/20 transition-colors"
+        />
+
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="shipped a new feature, wrote an article, etc."
+            value={description}
+            maxLength={140}
+            onChange={(e) => setDescription(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 pr-16 text-sm text-white placeholder:text-slate-500 outline-none focus:border-white/20 transition-colors"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 font-[family-name:var(--font-mono)] text-[10px] text-slate-500 pointer-events-none">
+            {description.length}/140
+          </span>
+        </div>
+
+        <div className="flex gap-2 flex-wrap">
+          {STATS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setTargetStat(s.key as Goal["target_stat"])}
+              className="font-[family-name:var(--font-mono)] text-[10px] px-2.5 py-1 rounded-full transition-all"
+              style={
+                targetStat === s.key
+                  ? { color: s.color, backgroundColor: s.color + "20", border: `1px solid ${s.color}40` }
+                  : { color: "rgba(255,255,255,0.25)", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }
+              }
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsPublic((v) => !v)}
+            className={`font-[family-name:var(--font-mono)] text-[10px] px-2.5 py-1 rounded-full border transition-all ${
+              isPublic ? "border-white/20 text-slate-200 bg-white/[0.06]" : "border-white/[0.06] text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            {isPublic ? "🌍 Public" : "🔒 Private"}
+          </button>
+          <button
+            disabled={!url.trim() || !description.trim() || submitting}
+            onClick={submit}
+            className="ml-auto rounded-lg bg-white/[0.06] border border-white/[0.1] px-5 py-2 text-sm text-slate-200 hover:text-white hover:bg-white/[0.1] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            {submitting ? "Submitting…" : "Submit →"}
+          </button>
+        </div>
+      </div>
+
+      {/* Section 2: Your Work */}
+      <div>
+        <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentClass} uppercase mb-3`}>
+          Your Work
+        </p>
+        {loadingWorks ? (
+          <div className="py-6 flex justify-center">
+            <div className="w-4 h-4 rounded-full border border-white/15 border-t-white/40 animate-spin" />
+          </div>
+        ) : works.length === 0 ? (
+          <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl px-5 py-8 text-center">
+            <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
+              No work submitted yet. Start building.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {works.map((w) => {
+              const statDef = STATS.find((s) => s.key === w.target_stat);
+              return (
+                <div key={w.id} className="bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3 flex flex-col gap-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm text-slate-200 leading-snug flex-1">{w.goal_text}</p>
+                    {statDef && (
+                      <span
+                        className="font-[family-name:var(--font-mono)] text-[10px] px-2 py-0.5 rounded-full flex-shrink-0"
+                        style={{ color: statDef.color, backgroundColor: statDef.color + "15" }}
+                      >
+                        {statDef.label}
+                      </span>
+                    )}
+                  </div>
+                  {w.proof_value && (
+                    <a
+                      href={w.proof_value}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-[family-name:var(--font-mono)] text-[11px] text-slate-400 hover:text-slate-200 truncate transition-colors"
+                    >
+                      {w.proof_value}
+                    </a>
+                  )}
+                  <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500">
+                    {new Date(w.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    {w.is_public && <span className="ml-2 text-slate-600">· public</span>}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── MAIN PAGE ──────────────────────────────────────────────────────────────
 export default function Dashboard() {
@@ -1120,25 +1300,6 @@ export default function Dashboard() {
       <Navbar />
 
       <div className="pt-14">
-        {/* ── COMPACT PERSISTENT HEADER ── */}
-        <div className="bg-white/[0.02] border-b border-white/5">
-          <div className="mx-auto max-w-4xl px-6 py-3 flex items-center gap-3">
-            <ProfileImage url={data.profile_image_url} handle={data.handle} size={40} />
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="font-bold text-white text-sm">@{data.handle}</span>
-              {streak && streak.current_streak > 0 && (
-                <span className="bg-white/[0.05] border border-white/[0.08] text-slate-300 text-xs px-2 py-0.5 rounded-full flex-shrink-0">
-                  🔥 {streak.current_streak}
-                </span>
-              )}
-            </div>
-            <div className="flex items-baseline gap-1 flex-shrink-0">
-              <span className="font-[family-name:var(--font-mono)] text-lg font-bold text-white">{totalScore}</span>
-              <span className="font-[family-name:var(--font-mono)] text-xs text-slate-500">/100</span>
-            </div>
-          </div>
-        </div>
-
         {/* ── TAB BAR ── */}
         <div className="sticky top-14 z-40 bg-[#050508] border-b border-white/5">
           <div className="mx-auto max-w-md flex">
@@ -1302,14 +1463,14 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* ── TAB 2: TASKS ── */}
-          {activeTab === "tasks" && (
-            <div className="mx-auto max-w-4xl px-6 py-8 space-y-8">
-              <DailyGoals
-                handle={data.handle} streak={streak} defaultPublic={goalsPublic}
-                onXPGained={handleXPGained}
-                onGoalCompleted={() => fetchDashboard(data.handle)}
+          {/* ── TAB 2: WORK ── */}
+          {activeTab === "work" && (
+            <div className="mx-auto max-w-4xl px-6 py-8">
+              <WorkTab
+                handle={data.handle}
+                goalsPublic={goalsPublic}
                 accentClass={accentCls}
+                onXPGained={handleXPGained}
               />
             </div>
           )}
