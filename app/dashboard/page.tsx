@@ -333,7 +333,10 @@ function SettingsPanel({
     try {
       const res = await fetch("/api/settings", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-darkroom-token": localStorage.getItem("darkroom_token") || "",
+        },
         body: JSON.stringify({ handle, profile_public: profilePublic, goals_public: goalsPublic, theme_accent: themeAccent }),
       });
       const data = await res.json();
@@ -615,7 +618,11 @@ function GoalCard({
         const form = new FormData();
         form.append("file", file);
         form.append("handle", handle);
-        const res = await fetch("/api/upload-proof", { method: "POST", body: form });
+        const res = await fetch("/api/upload-proof", {
+          method: "POST",
+          headers: { "x-darkroom-token": localStorage.getItem("darkroom_token") || "" },
+          body: form,
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Upload failed");
         proof = data.url;

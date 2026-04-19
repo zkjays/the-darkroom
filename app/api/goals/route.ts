@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { convertXPToPoints } from "@/app/lib/xp-system";
+import { getAuthToken, verifyAuth } from "@/app/lib/auth";
 
 function today() {
   return new Date().toISOString().split("T")[0];
@@ -58,6 +59,11 @@ export async function POST(req: NextRequest) {
 
   if (!handle || !goal_text || !proof_type || !target_stat) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  }
+
+  const token = getAuthToken(req);
+  if (!(await verifyAuth(handle, token))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const db = getServiceSupabase();
@@ -144,9 +150,16 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/goals — complete a goal with proof
 export async function PATCH(req: NextRequest) {
-  const { goal_id, proof_value } = await req.json();
+  const { handle, goal_id, proof_value } = await req.json();
   if (!goal_id || !proof_value) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  }
+
+  if (handle) {
+    const token = getAuthToken(req);
+    if (!(await verifyAuth(handle, token))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   const db = getServiceSupabase();

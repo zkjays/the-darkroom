@@ -236,6 +236,9 @@ function DarkroomIDContent() {
         setCooldownDays(data.days_remaining);
       } else if (data.success) {
         localStorage.setItem("darkroom_handle", answers.handle);
+        if (data.token) {
+          localStorage.setItem("darkroom_token", data.token);
+        }
         if (referrerHandle) {
           fetch("/api/referrals", {
             method: "POST",

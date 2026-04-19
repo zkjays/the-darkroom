@@ -135,6 +135,7 @@ export async function POST(req: NextRequest) {
 
   // New claim
   if (!existing) {
+    const authToken = crypto.randomUUID();
     const { error: insertError } = await db.from("darkroom_ids").insert({
       handle,
       score,
@@ -145,6 +146,7 @@ export async function POST(req: NextRequest) {
       darkroom_line,
       profile_image_url: profile_image_url ?? null,
       claim_count: 1,
+      auth_token: authToken,
     });
 
     if (insertError) {
@@ -153,7 +155,7 @@ export async function POST(req: NextRequest) {
 
     await upsertStreak(db, handle);
     await awardReferralXp(db, handle);
-    return NextResponse.json({ success: true, claimed: true });
+    return NextResponse.json({ success: true, claimed: true, token: authToken });
   }
 
   // Existing — check cooldown
@@ -171,6 +173,7 @@ export async function POST(req: NextRequest) {
 
   // Past cooldown — update
   const newCount = (existing.claim_count ?? 1) + 1;
+  const authToken = crypto.randomUUID();
   const { error: updateError } = await db
     .from("darkroom_ids")
     .update({
@@ -183,6 +186,7 @@ export async function POST(req: NextRequest) {
       profile_image_url: profile_image_url ?? null,
       claim_count: newCount,
       updated_at: new Date().toISOString(),
+      auth_token: authToken,
     })
     .eq("handle", handle);
 
@@ -191,5 +195,5 @@ export async function POST(req: NextRequest) {
   }
 
   await upsertStreak(db, handle);
-  return NextResponse.json({ success: true, reclaimed: true, claim_count: newCount });
+  return NextResponse.json({ success: true, reclaimed: true, claim_count: newCount, token: authToken });
 }

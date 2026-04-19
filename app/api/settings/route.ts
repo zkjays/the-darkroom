@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
+import { getAuthToken, verifyAuth } from "@/app/lib/auth";
 
 export async function GET(req: NextRequest) {
   const handle = req.nextUrl.searchParams.get("handle");
@@ -25,6 +26,11 @@ export async function PATCH(req: NextRequest) {
   const { handle, profile_public, goals_public, theme_accent } = body;
 
   if (!handle) return NextResponse.json({ error: "Missing handle" }, { status: 400 });
+
+  const token = getAuthToken(req);
+  if (!(await verifyAuth(handle, token))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const updates: Record<string, unknown> = {};
   if (typeof profile_public === "boolean") updates.profile_public = profile_public;

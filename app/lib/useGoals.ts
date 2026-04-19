@@ -54,7 +54,10 @@ export function useGoals(handle: string | null) {
       if (!handle) return;
       const res = await fetch("/api/goals", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-darkroom-token": localStorage.getItem("darkroom_token") || "",
+        },
         body: JSON.stringify({ handle, goal_text, proof_type, target_stat, is_public, template_id }),
       });
       const data = await res.json();
@@ -71,7 +74,10 @@ export function useGoals(handle: string | null) {
       if (!handle) return null;
       const res = await fetch("/api/goals", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-darkroom-token": localStorage.getItem("darkroom_token") || "",
+        },
         body: JSON.stringify({ handle, goal_id, proof_value }),
       });
       const data = await res.json();

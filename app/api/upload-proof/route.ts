@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
+import { getAuthToken, verifyAuth } from "@/app/lib/auth";
+
+const ALLOWED_MIME_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+const MAX_BYTES = 5 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -10,9 +19,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing file or handle" }, { status: 400 });
   }
 
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-  const filename = `${handle}-${Date.now()}.${ext}`;
+  const token = getAuthToken(req);
+  if (!(await verifyAuth(handle, token))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  if (file.size > MAX_BYTES) {
+    return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 413 });
+  }
+
+  const ext = ALLOWED_MIME_TYPES[file.type];
+  if (!ext) {
+    return NextResponse.json({ error: "Invalid file type" }, { status: 415 });
+  }
+
+  const filename = `${crypto.randomUUID()}.${ext}`;
   const buffer = new Uint8Array(await file.arrayBuffer());
   const db = getServiceSupabase();
 
