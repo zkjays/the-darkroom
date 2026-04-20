@@ -11,6 +11,7 @@ interface CardGeneratorProps {
   analysis: string;
   darkroomLine: string;
   profileImageUrl?: string;
+  onShare?: () => void;
 }
 
 const TWEET_TEMPLATES = [
@@ -58,6 +59,7 @@ export default function CardGenerator({
   stats,
   darkroomLine,
   profileImageUrl,
+  onShare,
 }: CardGeneratorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -308,6 +310,7 @@ export default function CardGenerator({
   const downloadCard = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    onShare?.();
     canvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -322,6 +325,7 @@ export default function CardGenerator({
   };
 
   const shareOnX = () => {
+    onShare?.();
     downloadCard();
     const template = TWEET_TEMPLATES[Math.floor(Math.random() * TWEET_TEMPLATES.length)];
     const text = template

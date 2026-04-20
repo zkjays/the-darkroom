@@ -1157,6 +1157,13 @@ function getButtonStyle(accent: string, variant: "primary" | "secondary"): strin
   return variant === "primary" ? cs.primaryBtn : cs.secondaryBtn;
 }
 
+const ACCENT_HEX: Record<string, string> = {
+  cyan:    "#67e8f9",
+  violet:  "#c4b5fd",
+  emerald: "#6ee7b7",
+  amber:   "#fcd34d",
+};
+
 const TABS = [
   { id: "id", label: "ID" },
   { id: "work", label: "Work" },
@@ -1164,6 +1171,108 @@ const TABS = [
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
+
+// ── ONBOARDING BANNER ──────────────────────────────────────────────────────
+function OnboardingBanner({
+  handle,
+  profilePublic,
+  hasShared,
+  accent,
+  onSwitchTab,
+  onDismiss,
+}: {
+  handle: string;
+  profilePublic: boolean;
+  hasShared: boolean;
+  accent: string;
+  onSwitchTab: (tab: TabId) => void;
+  onDismiss: () => void;
+}) {
+  const cs = getCardStyle(accent);
+  const hex = ACCENT_HEX[accent] ?? "#67e8f9";
+  const [hasWork, setHasWork] = useState(false);
+  const [allDoneFired, setAllDoneFired] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/goals?handle=${encodeURIComponent(handle)}&all=true&completed=true`)
+      .then((r) => r.json())
+      .then((d) => { if ((d.goals?.length ?? 0) > 0) setHasWork(true); })
+      .catch(() => {});
+  }, [handle]);
+
+  const steps: Array<{ label: string; done: boolean; onClick?: () => void }> = [
+    { label: "Check your score",   done: true },
+    { label: "Submit first proof", done: hasWork,       onClick: () => onSwitchTab("work") },
+    { label: "Go public",          done: profilePublic, onClick: () => onSwitchTab("settings") },
+    { label: "Share your ID",      done: hasShared,     onClick: () => onSwitchTab("id") },
+  ];
+
+  const completed = steps.filter((s) => s.done).length;
+  const allDone = completed === 4;
+  const activeIdx = steps.findIndex((s) => !s.done);
+
+  useEffect(() => {
+    if (!allDone || allDoneFired) return;
+    setAllDoneFired(true);
+    const t = setTimeout(onDismiss, 3000);
+    return () => clearTimeout(t);
+  }, [allDone, allDoneFired, onDismiss]);
+
+  return (
+    <div className={`${cs.primaryCard} rounded-xl p-4`}>
+      <div className="flex items-start gap-3 sm:gap-4">
+        {/* Left: title + count */}
+        <div className="flex-shrink-0">
+          <p className="text-sm font-bold text-white leading-tight">Getting started</p>
+          <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
+            {allDone ? "All done! You're set." : `${completed}/4 complete`}
+          </p>
+        </div>
+
+        {/* Steps */}
+        <div className="flex flex-wrap gap-1.5 flex-1 items-center">
+          {steps.map((step, i) => {
+            const isDone = step.done;
+            const isActive = i === activeIdx;
+            const accentStyle = isActive
+              ? { borderColor: hex + "4d", backgroundColor: hex + "0d", color: "#fff" }
+              : {};
+            return (
+              <button
+                key={step.label}
+                disabled={isDone || !step.onClick}
+                onClick={step.onClick}
+                style={accentStyle}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-[family-name:var(--font-mono)] text-[11px] transition-all ${
+                  isDone
+                    ? "border-white/5 text-slate-500 cursor-default"
+                    : isActive
+                    ? "border cursor-pointer hover:opacity-90 animate-pulse"
+                    : "border-white/5 text-slate-600 opacity-50 cursor-default"
+                }`}
+              >
+                <span className={isDone ? "text-emerald-400" : "text-slate-500"}>
+                  {isDone ? "✓" : i + 1}
+                </span>
+                <span className={isDone ? "line-through" : ""}>{step.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Dismiss */}
+        <button
+          onClick={onDismiss}
+          className="flex-shrink-0 text-slate-600 hover:text-slate-400 text-xs transition-colors pt-0.5"
+          title="Dismiss"
+          aria-label="Dismiss onboarding"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ── WORK TAB ───────────────────────────────────────────────────────────────
 function WorkTab({
@@ -1359,6 +1468,8 @@ export default function Dashboard() {
   const [goalsPublic, setGoalsPublic] = useState(false);
   const [accent, setAccent] = useState("cyan");
   const [linkCopied, setLinkCopied] = useState(false);
+  const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const [hasShared, setHasShared] = useState(false);
   const { messages: toastMessages, showToast } = useToast();
 
   const handleXPGained = useCallback(
@@ -1389,6 +1500,8 @@ export default function Dashboard() {
   useEffect(() => {
     const handle = localStorage.getItem("darkroom_handle");
     if (!handle) { router.replace("/darkroom-id"); return; }
+    if (localStorage.getItem("darkroom_onboarding_complete") !== "true") setOnboardingVisible(true); // eslint-disable-line react-hooks/set-state-in-effect
+    if (localStorage.getItem("darkroom_shared") === "true") setHasShared(true); // eslint-disable-line react-hooks/set-state-in-effect
     fetchDashboard(handle);
   }, [router, fetchDashboard]);
 
@@ -1396,6 +1509,16 @@ export default function Dashboard() {
     localStorage.removeItem("darkroom_handle");
     router.push("/");
   };
+
+  const dismissOnboarding = useCallback(() => {
+    localStorage.setItem("darkroom_onboarding_complete", "true");
+    setOnboardingVisible(false);
+  }, []);
+
+  const handleShare = useCallback(() => {
+    localStorage.setItem("darkroom_shared", "true");
+    setHasShared(true);
+  }, []);
 
   const toggleStat = (key: string) => setExpandedStat((prev) => (prev === key ? null : key));
 
@@ -1462,6 +1585,19 @@ export default function Dashboard() {
 
       {/* ── TAB CONTENT ── */}
       <main className="pb-24">
+        {/* Onboarding banner */}
+        {onboardingVisible && (
+          <div className="mx-auto max-w-4xl px-6 pt-6">
+            <OnboardingBanner
+              handle={data.handle}
+              profilePublic={profilePublic}
+              hasShared={hasShared}
+              accent={accent}
+              onSwitchTab={setActiveTab}
+              onDismiss={dismissOnboarding}
+            />
+          </div>
+        )}
 
         {/* ── TAB 1: ID ── */}
         {activeTab === "id" && (
@@ -1553,6 +1689,7 @@ export default function Dashboard() {
                   handle={data.handle} score={data.score} archetype={data.archetype}
                   tagline={data.tagline} stats={data.stats} analysis={data.analysis}
                   darkroomLine={data.darkroom_line} profileImageUrl={data.profile_image_url}
+                  onShare={handleShare}
                 />
               </div>
             </div>
