@@ -186,6 +186,13 @@ function useToast() {
   return { messages, showToast };
 }
 
+const STAT_BAR_GLOW: Record<string, string> = {
+  "#60A5FA": "shadow-[0_0_8px_rgba(96,165,250,0.3)]",
+  "#C084FC": "shadow-[0_0_8px_rgba(192,132,252,0.3)]",
+  "#34D399": "shadow-[0_0_8px_rgba(52,211,153,0.3)]",
+  "#FBBF24": "shadow-[0_0_8px_rgba(251,191,36,0.3)]",
+};
+
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -196,8 +203,10 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
         </div>
       )}
       <div className="h-[3px] w-full rounded-full bg-white/[0.08] overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-700 ease-out"
-          style={{ width: `${(value / 75) * 100}%`, backgroundColor: color || "#ffffff" }} />
+        <div
+          className={`h-full rounded-full transition-all duration-700 ease-out ${STAT_BAR_GLOW[color] ?? ""}`}
+          style={{ width: `${(value / 75) * 100}%`, backgroundColor: color || "#ffffff" }}
+        />
       </div>
     </div>
   );
@@ -359,7 +368,7 @@ function SettingsPanel({
   };
 
   return (
-    <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5 flex flex-col gap-5">
+    <div className={`${getCardStyle(themeAccent).primaryCard} rounded-xl p-5 flex flex-col gap-5`}>
       {/* Profile visibility */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-0.5">
@@ -440,7 +449,7 @@ function SettingsPanel({
           </div>
           <button
             onClick={handleCopy}
-            className="flex-shrink-0 rounded-lg border border-white/[0.08] px-3 py-2 font-[family-name:var(--font-mono)] text-[10px] text-slate-300 hover:text-slate-200 hover:border-white/20 transition-all"
+            className={`flex-shrink-0 rounded-lg px-3 py-2 font-[family-name:var(--font-mono)] text-[10px] text-slate-300 hover:text-slate-200 transition-all ${getButtonStyle(themeAccent, "secondary")}`}
           >
             {copied ? "Copied!" : "Copy"}
           </button>
@@ -455,7 +464,7 @@ function SettingsPanel({
       <button
         onClick={save}
         disabled={saving}
-        className="w-full rounded-lg bg-white/[0.06] border border-white/[0.1] py-2.5 text-sm text-slate-200 hover:text-white/90 hover:bg-white/[0.1] disabled:opacity-40 transition-all"
+        className={`w-full rounded-lg bg-white/[0.06] py-2.5 text-sm text-slate-200 hover:text-white/90 hover:bg-white/[0.1] disabled:opacity-40 transition-all ${getButtonStyle(themeAccent, "primary")}`}
       >
         {saved ? "Saved ✓" : saving ? "Saving…" : "Save settings"}
       </button>
@@ -1022,41 +1031,56 @@ function DailyGoals({
 
 // ── CARD STYLE SYSTEM ──────────────────────────────────────────────────────
 interface CardStyles {
-  primaryCard: string;
-  scoreCard:   string;
-  nestedCard:  string;
-  tabActive:   string;
+  primaryCard:  string;
+  scoreCard:    string;
+  nestedCard:   string;
+  tabActive:    string;
+  primaryBtn:   string;
+  secondaryBtn: string;
 }
 
 const CARD_STYLE_MAP: Record<string, CardStyles> = {
   cyan: {
-    primaryCard: "bg-gradient-to-br from-cyan-950/20 to-[#0c0c14] border border-cyan-500/[0.08]",
-    scoreCard:   "bg-gradient-to-b from-cyan-950/30 to-[#0c0c14] border border-cyan-500/[0.1]",
-    nestedCard:  "bg-[#12121e] border border-white/[0.06]",
-    tabActive:   "border-cyan-400",
+    primaryCard:  "bg-gradient-to-br from-cyan-950/20 to-[#0c0c14] border border-cyan-500/10 shadow-[0_0_15px_rgba(0,200,255,0.04)] hover:shadow-[0_0_25px_rgba(0,200,255,0.08)] hover:border-cyan-500/15 transition-all",
+    scoreCard:    "bg-gradient-to-b from-cyan-950/30 to-[#0c0c14] border border-cyan-500/10 shadow-[0_0_15px_rgba(0,200,255,0.04)]",
+    nestedCard:   "bg-[#12121e] border border-white/[0.06] shadow-[0_0_15px_rgba(0,200,255,0.03)]",
+    tabActive:    "border-cyan-400 shadow-[0_2px_10px_rgba(0,200,255,0.2)]",
+    primaryBtn:   "border border-cyan-500/20 shadow-[0_0_20px_rgba(0,200,255,0.15)] hover:shadow-[0_0_30px_rgba(0,200,255,0.25)]",
+    secondaryBtn: "border border-cyan-500/20 shadow-[0_0_12px_rgba(0,200,255,0.08)] hover:shadow-[0_0_20px_rgba(0,200,255,0.15)] hover:border-cyan-500/30 hover:bg-cyan-500/5",
   },
   violet: {
-    primaryCard: "bg-gradient-to-br from-violet-950/20 to-[#0c0c14] border border-violet-500/[0.08]",
-    scoreCard:   "bg-gradient-to-b from-violet-950/30 to-[#0c0c14] border border-violet-500/[0.1]",
-    nestedCard:  "bg-[#12121e] border border-white/[0.06]",
-    tabActive:   "border-violet-400",
+    primaryCard:  "bg-gradient-to-br from-violet-950/20 to-[#0c0c14] border border-violet-500/10 shadow-[0_0_15px_rgba(140,80,255,0.04)] hover:shadow-[0_0_25px_rgba(140,80,255,0.08)] hover:border-violet-500/15 transition-all",
+    scoreCard:    "bg-gradient-to-b from-violet-950/30 to-[#0c0c14] border border-violet-500/10 shadow-[0_0_15px_rgba(140,80,255,0.04)]",
+    nestedCard:   "bg-[#12121e] border border-white/[0.06] shadow-[0_0_15px_rgba(140,80,255,0.03)]",
+    tabActive:    "border-violet-400 shadow-[0_2px_10px_rgba(140,80,255,0.2)]",
+    primaryBtn:   "border border-violet-500/20 shadow-[0_0_20px_rgba(140,80,255,0.15)] hover:shadow-[0_0_30px_rgba(140,80,255,0.25)]",
+    secondaryBtn: "border border-violet-500/20 shadow-[0_0_12px_rgba(140,80,255,0.08)] hover:shadow-[0_0_20px_rgba(140,80,255,0.15)] hover:border-violet-500/30 hover:bg-violet-500/5",
   },
   emerald: {
-    primaryCard: "bg-gradient-to-br from-emerald-950/20 to-[#0c0c14] border border-emerald-500/[0.08]",
-    scoreCard:   "bg-gradient-to-b from-emerald-950/30 to-[#0c0c14] border border-emerald-500/[0.1]",
-    nestedCard:  "bg-[#12121e] border border-white/[0.06]",
-    tabActive:   "border-emerald-400",
+    primaryCard:  "bg-gradient-to-br from-emerald-950/20 to-[#0c0c14] border border-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.04)] hover:shadow-[0_0_25px_rgba(16,185,129,0.08)] hover:border-emerald-500/15 transition-all",
+    scoreCard:    "bg-gradient-to-b from-emerald-950/30 to-[#0c0c14] border border-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.04)]",
+    nestedCard:   "bg-[#12121e] border border-white/[0.06] shadow-[0_0_15px_rgba(16,185,129,0.03)]",
+    tabActive:    "border-emerald-400 shadow-[0_2px_10px_rgba(16,185,129,0.2)]",
+    primaryBtn:   "border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.15)] hover:shadow-[0_0_30px_rgba(16,185,129,0.25)]",
+    secondaryBtn: "border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.08)] hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] hover:border-emerald-500/30 hover:bg-emerald-500/5",
   },
   amber: {
-    primaryCard: "bg-gradient-to-br from-amber-950/20 to-[#0c0c14] border border-amber-500/[0.08]",
-    scoreCard:   "bg-gradient-to-b from-amber-950/30 to-[#0c0c14] border border-amber-500/[0.1]",
-    nestedCard:  "bg-[#12121e] border border-white/[0.06]",
-    tabActive:   "border-amber-400",
+    primaryCard:  "bg-gradient-to-br from-amber-950/20 to-[#0c0c14] border border-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.04)] hover:shadow-[0_0_25px_rgba(245,158,11,0.08)] hover:border-amber-500/15 transition-all",
+    scoreCard:    "bg-gradient-to-b from-amber-950/30 to-[#0c0c14] border border-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.04)]",
+    nestedCard:   "bg-[#12121e] border border-white/[0.06] shadow-[0_0_15px_rgba(245,158,11,0.03)]",
+    tabActive:    "border-amber-400 shadow-[0_2px_10px_rgba(245,158,11,0.2)]",
+    primaryBtn:   "border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.15)] hover:shadow-[0_0_30px_rgba(245,158,11,0.25)]",
+    secondaryBtn: "border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.08)] hover:shadow-[0_0_20px_rgba(245,158,11,0.15)] hover:border-amber-500/30 hover:bg-amber-500/5",
   },
 };
 
 function getCardStyle(accent: string): CardStyles {
   return CARD_STYLE_MAP[accent] ?? CARD_STYLE_MAP.cyan;
+}
+
+function getButtonStyle(accent: string, variant: "primary" | "secondary"): string {
+  const cs = getCardStyle(accent);
+  return variant === "primary" ? cs.primaryBtn : cs.secondaryBtn;
 }
 
 const TABS = [
@@ -1186,7 +1210,7 @@ function WorkTab({
           <button
             disabled={!url.trim() || !description.trim() || submitting}
             onClick={submit}
-            className="ml-auto rounded-lg bg-white/[0.06] border border-white/[0.1] px-5 py-2 text-sm text-slate-200 hover:text-white hover:bg-white/[0.1] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className={`ml-auto rounded-lg bg-white/[0.06] px-5 py-2 text-sm text-slate-200 hover:text-white hover:bg-white/[0.1] disabled:opacity-30 disabled:cursor-not-allowed transition-all ${cs.primaryBtn}`}
           >
             {submitting ? "Submitting…" : "Submit →"}
           </button>
@@ -1547,7 +1571,7 @@ export default function Dashboard() {
 
             {canReclaim ? (
               <button onClick={() => router.push("/darkroom-id")}
-                className="w-full rounded-xl border border-white/10 px-5 py-3 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all">
+                className={`w-full rounded-xl px-5 py-3 text-sm text-slate-300 hover:text-white transition-all ${cs.secondaryBtn}`}>
                 Reclaim ID →
               </button>
             ) : (
