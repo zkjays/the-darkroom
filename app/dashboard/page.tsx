@@ -116,58 +116,58 @@ interface TierAdvice { description: string; daily_actions: string[] }
 const TIER_ADVICE: Record<string, [TierAdvice, TierAdvice, TierAdvice]> = {
   focus: [
     {
-      description: "You're spreading thin. Depth beats breadth every time.",
-      daily_actions: ["Pick ONE topic. Tweet only about that for 7 days.", "Unfollow 10 accounts that pull you off-track."],
+      description: "You're pulled in too many directions. The ones who win pick one lane and own it.",
+      daily_actions: ["Choose one priority this week. Say no to everything else.", "Ask yourself: if I could only work on one thing today, what moves the needle?"],
     },
     {
-      description: "Getting sharper. Now cut the noise and double down on what you know best.",
-      daily_actions: ["Write one thread this week instead of 20 replies.", "Before tweeting, ask: does this build my expertise?"],
+      description: "You know what matters. Now protect your time like it's your most valuable asset.",
+      daily_actions: ["Block 2 hours of deep work on YOUR thing today. No notifications.", "Before saying yes to anything, ask: does this serve my main goal?"],
     },
     {
-      description: "Locked in. You're becoming the go-to voice. Keep going deeper.",
-      daily_actions: ["Create a content series — 5 posts exploring one idea deeply.", "Share your process and frameworks, not just results."],
+      description: "Dialed in. Your focus is rare — most people never get here.",
+      daily_actions: ["Go deeper where you're already strong. Teach what you know.", "Create a system or framework from your experience. Package your expertise."],
     },
   ],
   consistency: [
     {
-      description: "You show up in bursts. The algorithm and your audience reward daily presence.",
-      daily_actions: ["Set a daily alarm. Post one thing before 10am.", "Start a 7-day challenge: one original tweet per day, no excuses."],
+      description: "Bursts of energy don't build anything lasting. Small daily actions do.",
+      daily_actions: ["Do one small thing for your goal today. Even 15 minutes counts.", "Set a recurring reminder. Show up at the same time every day."],
     },
     {
-      description: "You have a rhythm forming. Lock it in and make it automatic.",
-      daily_actions: ["Block 30 min daily for content. Same time, every day.", "Track your posting streak. Don't break the chain."],
+      description: "You're building a habit. The hardest part is behind you. Don't stop.",
+      daily_actions: ["Track your streak. Momentum is fragile — protect it.", "On low-energy days, do the minimum. Never zero."],
     },
     {
-      description: "Iron discipline. Your consistency is your competitive edge.",
-      daily_actions: ["You're consistent. Now optimize: test different posting times.", "Batch-create content on weekends for the whole week."],
+      description: "Most people quit by now. You're still here. That's the real flex.",
+      daily_actions: ["You show up. Now help someone else stay consistent.", "Optimize your routine — find what gives you the most output per hour."],
     },
   ],
   reliability: [
     {
-      description: "Projects can't find you yet. Make your work visible and your engagement meaningful.",
-      daily_actions: ["Reply to 3 builders with real value today, not just 'great post'.", "Add your actual role or project to your bio."],
+      description: "People don't know if they can count on you yet. Prove it with one delivery.",
+      daily_actions: ["Finish one thing you started this week. Done beats perfect.", "Make a promise to one person and keep it. Start small."],
     },
     {
-      description: "You're building trust. Keep showing receipts and being useful.",
-      daily_actions: ["Share one thing you shipped or learned this week with proof.", "Engage in conversations where you can actually help someone."],
+      description: "Trust is built one delivery at a time. You're stacking proof.",
+      daily_actions: ["Share proof of what you've done — not what you plan to do.", "When you commit to something, follow through. Every time."],
     },
     {
-      description: "People trust you. Now leverage that into leadership and collabs.",
-      daily_actions: ["Mentor one builder publicly this week.", "Document a case study of your recent work."],
+      description: "When people think 'who can I trust to get this done?' — your name comes up.",
+      daily_actions: ["You deliver. Now raise the stakes — take on a bigger challenge.", "Help others ship. Your reliability makes teams stronger."],
     },
   ],
   growth: [
     {
-      description: "Growth starts with learning from those ahead of you. Study, then apply.",
-      daily_actions: ["Study one account that grew fast in your niche. What do they do differently?", "Engage with 5 accounts bigger than you with thoughtful replies."],
+      description: "Growth starts with curiosity. You're at the beginning — that's exciting, not shameful.",
+      daily_actions: ["Learn one new thing today. Write down what you learned.", "Find someone 6 months ahead of you. Watch what they actually do."],
     },
     {
-      description: "You're moving. Now amplify — turn engagement into original content.",
-      daily_actions: ["Collaborate: quote-tweet a builder you respect with your own take.", "Repurpose your best reply into a standalone thread."],
+      description: "You're evolving. Now turn learning into doing — that's where real growth happens.",
+      daily_actions: ["Take what you learned and apply it. Knowledge without action is just entertainment.", "Share your journey — the messy parts are what people connect with."],
     },
     {
-      description: "Real momentum. You're growing with substance, not just numbers.",
-      daily_actions: ["Help 3 smaller builders this week. Growth compounds through generosity.", "Launch something small and share the journey publicly."],
+      description: "You're growing with substance. Not vanity metrics — real capability.",
+      daily_actions: ["Give back. Help someone at the stage you were 6 months ago.", "Launch something imperfect. Growth accelerates when you ship."],
     },
   ],
 };
