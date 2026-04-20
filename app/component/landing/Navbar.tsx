@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 
 interface XPState {
+  score: number;
   current: number;
   cost: number;
   accent: string;
@@ -41,7 +42,7 @@ export default function Navbar() {
         const score = (d.total_score ?? d.score ?? 0) as number;
         const totalXP = (d.total_xp ?? 0) as number;
         const cost = getXPCost(score);
-        setXP({ current: totalXP % cost, cost, accent: d.theme_accent ?? "cyan" });
+        setXP({ score, current: totalXP % cost, cost, accent: d.theme_accent ?? "cyan" });
       })
       .catch(() => {});
   }, []);
@@ -99,9 +100,11 @@ export default function Navbar() {
               className="flex flex-col items-end gap-1"
               title={`${xp.cost - xp.current} XP until next score point`}
             >
-              <span className="font-mono text-xs text-slate-400">
-                {xp.current}/{xp.cost} XP
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-white">{xp.score}</span>
+                <span className="text-slate-500 text-xs">|</span>
+                <span className="font-mono text-xs text-slate-400">{xp.current}/{xp.cost} XP</span>
+              </div>
               <div className="h-[2px] w-15 rounded-full bg-slate-700 overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
