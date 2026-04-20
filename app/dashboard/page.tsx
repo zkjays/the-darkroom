@@ -111,6 +111,75 @@ const statConfig: Record<string, { improvements: Array<{ label: string; points: 
   },
 };
 
+interface TierAdvice { description: string; daily_actions: string[] }
+
+const TIER_ADVICE: Record<string, [TierAdvice, TierAdvice, TierAdvice]> = {
+  focus: [
+    {
+      description: "You're spreading thin. Depth beats breadth every time.",
+      daily_actions: ["Pick ONE topic. Tweet only about that for 7 days.", "Unfollow 10 accounts that pull you off-track."],
+    },
+    {
+      description: "Getting sharper. Now cut the noise and double down on what you know best.",
+      daily_actions: ["Write one thread this week instead of 20 replies.", "Before tweeting, ask: does this build my expertise?"],
+    },
+    {
+      description: "Locked in. You're becoming the go-to voice. Keep going deeper.",
+      daily_actions: ["Create a content series — 5 posts exploring one idea deeply.", "Share your process and frameworks, not just results."],
+    },
+  ],
+  consistency: [
+    {
+      description: "You show up in bursts. The algorithm and your audience reward daily presence.",
+      daily_actions: ["Set a daily alarm. Post one thing before 10am.", "Start a 7-day challenge: one original tweet per day, no excuses."],
+    },
+    {
+      description: "You have a rhythm forming. Lock it in and make it automatic.",
+      daily_actions: ["Block 30 min daily for content. Same time, every day.", "Track your posting streak. Don't break the chain."],
+    },
+    {
+      description: "Iron discipline. Your consistency is your competitive edge.",
+      daily_actions: ["You're consistent. Now optimize: test different posting times.", "Batch-create content on weekends for the whole week."],
+    },
+  ],
+  reliability: [
+    {
+      description: "Projects can't find you yet. Make your work visible and your engagement meaningful.",
+      daily_actions: ["Reply to 3 builders with real value today, not just 'great post'.", "Add your actual role or project to your bio."],
+    },
+    {
+      description: "You're building trust. Keep showing receipts and being useful.",
+      daily_actions: ["Share one thing you shipped or learned this week with proof.", "Engage in conversations where you can actually help someone."],
+    },
+    {
+      description: "People trust you. Now leverage that into leadership and collabs.",
+      daily_actions: ["Mentor one builder publicly this week.", "Document a case study of your recent work."],
+    },
+  ],
+  growth: [
+    {
+      description: "Growth starts with learning from those ahead of you. Study, then apply.",
+      daily_actions: ["Study one account that grew fast in your niche. What do they do differently?", "Engage with 5 accounts bigger than you with thoughtful replies."],
+    },
+    {
+      description: "You're moving. Now amplify — turn engagement into original content.",
+      daily_actions: ["Collaborate: quote-tweet a builder you respect with your own take.", "Repurpose your best reply into a standalone thread."],
+    },
+    {
+      description: "Real momentum. You're growing with substance, not just numbers.",
+      daily_actions: ["Help 3 smaller builders this week. Growth compounds through generosity.", "Launch something small and share the journey publicly."],
+    },
+  ],
+};
+
+function getTierAdvice(statKey: string, statScore: number): TierAdvice {
+  const tiers = TIER_ADVICE[statKey];
+  if (!tiers) return { description: "", daily_actions: [] };
+  if (statScore <= 35) return tiers[0];
+  if (statScore <= 55) return tiers[1];
+  return tiers[2];
+}
+
 function formatDate(data: DashboardData) {
   const raw = data.claimed_at || data.created_at || data.updated_at;
   if (!raw) return "Unknown";
@@ -220,7 +289,6 @@ function StatCard({
   statXp?: number; totalScore?: number; cardCls?: string;
 }) {
   const cfg = statConfig[statKey] ?? { improvements: [] };
-  const stat = STATS.find((s) => s.key === statKey);
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(0);
 
@@ -253,51 +321,57 @@ function StatCard({
       </div>
       <div style={{ maxHeight: height, overflow: "hidden", transition: "max-height 300ms ease" }}>
         <div ref={contentRef} className="flex flex-col gap-4 pt-2 border-t border-white/[0.05]">
-          {stat && <p className="text-xs text-slate-200 leading-relaxed">{stat.description}</p>}
+          {(() => {
+            const tier = getTierAdvice(statKey, value);
+            return (
+              <>
+                <p className="text-xs text-slate-300 italic leading-relaxed">{tier.description}</p>
 
-          {/* XP progress toward next point */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex justify-between items-center">
-              <span className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-[0.15em]">XP progress</span>
-              <span className="font-[family-name:var(--font-mono)] text-[10px]" style={{ color: color + "99" }}>
-                {xpAccum} / {xpCost} XP
-              </span>
-            </div>
-            <div className="h-[2px] w-full rounded-full bg-white/[0.06] overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, (xpAccum / xpCost) * 100)}%`, backgroundColor: color }} />
-            </div>
-            <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500">
-              Complete goals targeting this stat to earn XP → score points
-            </p>
-          </div>
+                {/* XP progress toward next point */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-[0.15em]">XP progress</span>
+                    <span className="font-[family-name:var(--font-mono)] text-[10px]" style={{ color: color + "99" }}>
+                      {xpAccum} / {xpCost} XP
+                    </span>
+                  </div>
+                  <div className="h-[2px] w-full rounded-full bg-white/[0.06] overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, (xpAccum / xpCost) * 100)}%`, backgroundColor: color }} />
+                  </div>
+                  <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500">
+                    Complete goals targeting this stat to earn XP → score points
+                  </p>
+                </div>
 
-          {stat && (
-            <div className="flex flex-col gap-2">
-              <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.15em] text-slate-500 uppercase">Daily actions</p>
-              {stat.actions.map((action) => (
-                <div key={action} className="flex items-start gap-2">
-                  <span className="text-slate-500 mt-0.5 flex-shrink-0">→</span>
-                  <span className="text-xs text-white/55 leading-relaxed">{action}</span>
+                <div className="flex flex-col gap-2">
+                  <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.15em] text-slate-500 uppercase">Daily actions</p>
+                  {tier.daily_actions.map((action) => (
+                    <div key={action} className="flex items-start gap-2">
+                      <span className="text-slate-500 mt-0.5 flex-shrink-0">→</span>
+                      <span className="text-xs text-white/55 leading-relaxed">{action}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-          <div className="flex flex-col gap-2">
-            <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.15em] text-slate-500 uppercase">How to improve</p>
-            {cfg.improvements.map((item) => (
-              <div key={item.label} className="flex items-center justify-between gap-3 opacity-40">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xs flex-shrink-0">🔒</span>
-                  <span className="text-xs text-slate-200 truncate">{item.label}</span>
+
+                <div className="flex flex-col gap-2">
+                  <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.15em] text-slate-500 uppercase">How to improve</p>
+                  {cfg.improvements.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between gap-3 opacity-40">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs flex-shrink-0">🔒</span>
+                        <span className="text-xs text-slate-200 truncate">{item.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-xs text-slate-300">{item.points}</span>
+                        <span className="bg-white/[0.05] text-slate-400 text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap">soon</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs text-slate-300">{item.points}</span>
-                  <span className="bg-white/[0.05] text-slate-400 text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap">soon</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>
