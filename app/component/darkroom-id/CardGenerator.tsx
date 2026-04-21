@@ -74,35 +74,20 @@ export default function CardGenerator({
 
       const W = 1200;
       const H = 630;
-      const CX = W / 2; // horizontal center
 
       // ── Background ──
       ctx.fillStyle = "#08080C";
       ctx.fillRect(0, 0, W, H);
 
-      // Depth gradient from center
-      const depthGrad = ctx.createRadialGradient(CX, H / 2, 0, CX, H / 2, W * 0.7);
-      depthGrad.addColorStop(0, "rgba(255,255,255,0.04)");
-      depthGrad.addColorStop(1, "transparent");
-      ctx.fillStyle = depthGrad;
-      ctx.fillRect(0, 0, W, H);
-
-      // Cyan glow — top-left
-      const cyanGlow = ctx.createRadialGradient(150, 100, 0, 150, 100, 250);
-      cyanGlow.addColorStop(0, "rgba(0,180,255,0.07)");
-      cyanGlow.addColorStop(1, "transparent");
-      ctx.fillStyle = cyanGlow;
-      ctx.fillRect(0, 0, W, H);
-
-      // Purple glow — bottom-right
-      const purpleGlow = ctx.createRadialGradient(1050, 530, 0, 1050, 530, 250);
-      purpleGlow.addColorStop(0, "rgba(130,80,255,0.06)");
-      purpleGlow.addColorStop(1, "transparent");
-      ctx.fillStyle = purpleGlow;
+      // Center glow
+      const centerGlow = ctx.createRadialGradient(450, 300, 0, 450, 300, 400);
+      centerGlow.addColorStop(0, "rgba(255,255,255,0.04)");
+      centerGlow.addColorStop(1, "transparent");
+      ctx.fillStyle = centerGlow;
       ctx.fillRect(0, 0, W, H);
 
       // Grid
-      ctx.strokeStyle = "rgba(255,255,255,0.03)";
+      ctx.strokeStyle = "rgba(255,255,255,0.02)";
       ctx.lineWidth = 1;
       for (let x = 0; x <= W; x += 40) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
@@ -112,35 +97,28 @@ export default function CardGenerator({
       }
 
       // Vignette
-      const vignette = ctx.createRadialGradient(CX, H / 2, H * 0.15, CX, H / 2, W * 0.8);
+      const vignette = ctx.createRadialGradient(W / 2, H / 2, H * 0.2, W / 2, H / 2, W * 0.85);
       vignette.addColorStop(0, "rgba(0,0,0,0)");
-      vignette.addColorStop(1, "rgba(0,0,0,0.6)");
+      vignette.addColorStop(1, "rgba(0,0,0,0.5)");
       ctx.fillStyle = vignette;
       ctx.fillRect(0, 0, W, H);
 
-      // ── Top bar ──
-      ctx.font = "400 11px monospace";
-      ctx.fillStyle = "rgba(255,255,255,0.20)";
-      ctx.textAlign = "left";
+      // ── Branding ──
       ctx.textBaseline = "alphabetic";
-      ctx.fillText("● THE DARKROOM", 44, 58);
+      ctx.font = "400 11px monospace";
+      ctx.fillStyle = "rgba(255,255,255,0.2)";
+      ctx.textAlign = "left";
+      ctx.fillText("● THE DARKROOM", 30, 48);
 
       ctx.font = "400 10px monospace";
-      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
       ctx.textAlign = "right";
-      ctx.fillText("thedarkroom.xyz", W - 44, 58);
+      ctx.fillText("thedarkroom.xyz", 1170, 48);
 
-      // ── PFP ──
-      const pfpCx = CX;
+      // ── LEFT SIDE: PFP + handle ──
+      const pfpCx = 70;
       const pfpCy = 160;
-      const pfpR = 50;
-
-      // Glow behind PFP
-      const pfpGlow = ctx.createRadialGradient(pfpCx, pfpCy, 0, pfpCx, pfpCy, 80);
-      pfpGlow.addColorStop(0, "rgba(255,255,255,0.05)");
-      pfpGlow.addColorStop(1, "transparent");
-      ctx.fillStyle = pfpGlow;
-      ctx.fillRect(pfpCx - 80, pfpCy - 80, 160, 160);
+      const pfpR = 30;
 
       if (pfpImg) {
         ctx.save();
@@ -154,137 +132,118 @@ export default function CardGenerator({
         ctx.arc(pfpCx, pfpCy, pfpR, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(255,255,255,0.05)";
         ctx.fill();
-        ctx.font = "bold 36px Arial";
-        ctx.fillStyle = "rgba(255,255,255,0.25)";
+        ctx.font = "bold 22px Arial";
+        ctx.fillStyle = "rgba(255,255,255,0.3)";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(handle.charAt(0).toUpperCase(), pfpCx, pfpCy);
+        ctx.textBaseline = "alphabetic";
       }
 
       // PFP ring
       ctx.beginPath();
       ctx.arc(pfpCx, pfpCy, pfpR, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.strokeStyle = "rgba(255,255,255,0.1)";
       ctx.lineWidth = 2;
       ctx.stroke();
 
       // @handle
-      ctx.font = "400 14px monospace";
-      ctx.fillStyle = "rgba(255,255,255,0.50)";
-      ctx.textAlign = "center";
+      ctx.font = "400 16px monospace";
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`@${handle}`, 115, pfpCy);
       ctx.textBaseline = "alphabetic";
-      ctx.fillText(`@${handle}`, pfpCx, 230);
 
-      // ── Score (hero element) ──
-      // Measure score + "/100" widths to center them together
-      ctx.font = "800 80px Arial";
-      const scoreW = ctx.measureText(String(score)).width;
-      ctx.font = "400 26px Arial";
-      const slashW = ctx.measureText("/100").width;
-      const gap = 10;
-      const totalScoreW = scoreW + gap + slashW;
-      const scoreX = CX - totalScoreW / 2;
-
+      // ── Score hero ──
       ctx.shadowBlur = 30;
-      ctx.shadowColor = "rgba(255,255,255,0.15)";
-      ctx.font = "800 80px Arial";
+      ctx.shadowColor = "rgba(255,255,255,0.12)";
+      ctx.font = "800 120px Arial";
       ctx.fillStyle = "rgba(255,255,255,1)";
       ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillText(String(score), scoreX, 305);
+      ctx.fillText(String(score), 60, 330);
       ctx.shadowBlur = 0;
       ctx.shadowColor = "transparent";
 
-      ctx.font = "400 26px Arial";
-      ctx.fillStyle = "rgba(255,255,255,0.25)";
-      ctx.fillText("/100", scoreX + scoreW + gap, 305);
+      ctx.font = "400 11px monospace";
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.textAlign = "left";
+      ctx.fillText("DARKROOM SCORE", 62, 355);
 
       // ── Archetype ──
       ctx.font = "700 28px Arial";
       ctx.fillStyle = "rgba(255,255,255,1)";
-      ctx.textAlign = "center";
-      ctx.fillText(archetype, CX, 348);
+      ctx.textAlign = "left";
+      ctx.fillText(archetype, 60, 395);
 
       // ── Tagline ──
       ctx.font = "italic 400 13px monospace";
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
-      ctx.textAlign = "center";
-      ctx.fillText(tagline, CX, 375);
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.textAlign = "left";
+      ctx.fillText(tagline, 60, 425);
 
-      // ── Separator ──
+      // ── Vertical separator ──
       ctx.beginPath();
-      ctx.moveTo(CX - 150, 400);
-      ctx.lineTo(CX + 150, 400);
-      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.moveTo(580, 120);
+      ctx.lineTo(580, 520);
+      ctx.strokeStyle = "rgba(255,255,255,0.04)";
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // ── Stats 2×2 grid ──
-      // Cell size: 240px wide, gap: 20px → total 500px centered
-      const cellW = 240;
-      const colGap = 20;
-      const gridW = cellW * 2 + colGap;
-      const gridX = CX - gridW / 2; // left edge of grid
-      const colX = [gridX, gridX + cellW + colGap]; // x of each column
-      const rowY = [422, 492]; // y of each row
-      const maxBarW = cellW - 20; // bar max width per cell (with 10px padding each side)
-
-      const statGrid: Array<{ key: keyof typeof stats; col: number; row: number }> = [
-        { key: "focus",       col: 0, row: 0 },
-        { key: "consistency", col: 1, row: 0 },
-        { key: "reliability", col: 0, row: 1 },
-        { key: "growth",      col: 1, row: 1 },
+      // ── RIGHT SIDE: Stats 2×2 ──
+      const statLayout: Array<{ key: keyof typeof stats; cx: number; baseY: number }> = [
+        { key: "focus",       cx: 700,  baseY: 200 },
+        { key: "consistency", cx: 950,  baseY: 200 },
+        { key: "reliability", cx: 700,  baseY: 340 },
+        { key: "growth",      cx: 950,  baseY: 340 },
       ];
+      const barW = 80;
 
-      statGrid.forEach(({ key, col, row }) => {
-        const x = colX[col];
-        const y = rowY[row];
+      statLayout.forEach(({ key, cx, baseY }) => {
         const val = stats[key];
         const color = STAT_COLORS[key];
-        const cellCx = x + cellW / 2;
 
         // Label
-        ctx.font = "400 9px monospace";
-        ctx.fillStyle = "rgba(255,255,255,0.40)";
+        ctx.font = "400 10px monospace";
+        ctx.fillStyle = "rgba(255,255,255,0.25)";
         ctx.textAlign = "center";
-        ctx.textBaseline = "alphabetic";
-        ctx.fillText(key.toUpperCase(), cellCx, y);
+        ctx.fillText(key.toUpperCase(), cx, baseY);
 
-        // Value number
-        ctx.font = `700 24px Arial`;
+        // Value
+        ctx.font = "700 36px Arial";
         ctx.fillStyle = color;
         ctx.textAlign = "center";
-        ctx.textBaseline = "alphabetic";
-        ctx.fillText(String(val), cellCx, y + 28);
+        ctx.fillText(String(val), cx, baseY + 42);
 
         // Bar track
-        const barX = x + 10;
-        const barY = y + 36;
-        const barH = 3;
-        ctx.fillStyle = "rgba(255,255,255,0.08)";
-        drawRoundedRect(ctx, barX, barY, maxBarW, barH, 2);
+        const barX = cx - barW / 2;
+        const barY = baseY + 54;
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        drawRoundedRect(ctx, barX, barY, barW, 3, 2);
         ctx.fill();
 
-        // Bar fill
-        const fillW = Math.max(maxBarW * (val / 100), 4);
+        // Bar fill with glow
+        const fillW = Math.max(barW * (val / 75), 3);
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = color;
         ctx.fillStyle = color;
-        drawRoundedRect(ctx, barX, barY, fillW, barH, 2);
+        drawRoundedRect(ctx, barX, barY, fillW, 3, 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = "transparent";
       });
 
       // ── Darkroom line ──
-      ctx.font = "italic 400 11px monospace";
-      ctx.fillStyle = "rgba(255,255,255,0.20)";
+      ctx.font = "italic 400 10px monospace";
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
       ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillText(darkroomLine, CX, 565);
+      ctx.fillText(darkroomLine, 600, 570);
 
-      // ── Bottom-right stamp ──
+      // ── Bottom stamp ──
       ctx.font = "400 9px monospace";
-      ctx.fillStyle = "rgba(255,255,255,0.10)";
+      ctx.fillStyle = "rgba(255,255,255,0.08)";
       ctx.textAlign = "right";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillText("darkroom-id", W - 44, H - 20);
+      ctx.fillText("darkroom-id", 1150, 610);
 
       setPreviewUrl(canvas.toDataURL("image/png"));
     };
