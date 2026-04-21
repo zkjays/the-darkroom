@@ -346,7 +346,7 @@ function DarkroomIDContent() {
           )}
 
           {/* Screen 1: Multi-select goals */}
-          {!showWaitlist && !showAlreadyClaimed && step === 1 && (
+          {!showAlreadyClaimed && step === 1 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
               <h2 className="text-2xl font-bold text-white mb-1 leading-snug">
                 What are you building toward?
@@ -397,7 +397,7 @@ function DarkroomIDContent() {
           )}
 
           {/* Screen 2: Loading + Results */}
-          {!showWaitlist && !showAlreadyClaimed && step === 2 && (
+          {!showAlreadyClaimed && step === 2 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
 
               {/* Loading / error state */}
