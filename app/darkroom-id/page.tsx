@@ -5,7 +5,6 @@ export const dynamic = "force-dynamic";
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../component/landing/Navbar";
-import { isTester } from "@/app/lib/testers";
 import CardGenerator from "../component/darkroom-id/CardGenerator";
 import type { DarkroomResult } from "../api/generate/route";
 
@@ -93,7 +92,6 @@ function DarkroomIDContent() {
   const [claimState, setClaimState] = useState<"idle" | "loading" | "cooldown">("idle");
   const [cooldownDays, setCooldownDays] = useState(0);
   const [referrerHandle, setReferrerHandle] = useState<string | null>(null);
-  const [showWaitlist, setShowWaitlist] = useState(false);
   const [showAlreadyClaimed, setShowAlreadyClaimed] = useState(false);
   const [alreadyClaimedDays, setAlreadyClaimedDays] = useState(0);
   const [checkingHandle, setCheckingHandle] = useState(false);
@@ -112,10 +110,6 @@ function DarkroomIDContent() {
 
   const handleContinue = async () => {
     if (answers.handle.length < 2 || checkingHandle) return;
-    if (!isTester(answers.handle)) {
-      setShowWaitlist(true);
-      return;
-    }
     setCheckingHandle(true);
     try {
       const res = await fetch(`/api/check-claim?handle=${encodeURIComponent(answers.handle)}`);
@@ -312,35 +306,8 @@ function DarkroomIDContent() {
             </div>
           )}
 
-          {/* Waitlist screen */}
-          {showWaitlist && (
-            <div className="flex flex-col items-center text-center gap-5">
-              <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.3em] text-slate-400 uppercase">
-                Early Access
-              </p>
-              <h1 className="text-2xl font-bold text-white leading-snug">
-                Not on the list yet.
-              </h1>
-              <p className="text-slate-300 text-sm leading-relaxed max-w-xs">
-                The Darkroom is in closed alpha. We&apos;re building with a small group first.
-              </p>
-              <p className="font-[family-name:var(--font-mono)] text-sm text-slate-200">
-                @{answers.handle}
-              </p>
-              <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
-                Want in? DM <span className="text-white">@zkjays</span> on X
-              </p>
-              <button
-                onClick={() => { setShowWaitlist(false); setAnswers((prev) => ({ ...prev, handle: "" })); }}
-                className="mt-2 rounded-xl border border-white/10 px-6 py-3 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all"
-              >
-                Try another handle
-              </button>
-            </div>
-          )}
-
           {/* Screen 0: Handle input */}
-          {!showWaitlist && !showAlreadyClaimed && step === 0 && (
+          {!showAlreadyClaimed && step === 0 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
               {referrerHandle && (
                 <div className="mb-6 inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-full px-4 py-1.5">
