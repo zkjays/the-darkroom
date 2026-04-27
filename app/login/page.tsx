@@ -7,9 +7,11 @@ import { useState } from "react";
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     setLoading(true);
-    signIn("twitter", { callbackUrl: "/darkroom-id" });
+    await signIn("twitter", {
+      callbackUrl: "http://localhost:3000/darkroom-id"
+    });
   };
 
   return (
