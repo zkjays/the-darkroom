@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { convertXPToPoints } from "@/app/lib/xp-system";
-import { getAuthToken, verifyAuth } from "@/app/lib/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 
 function today() {
   return new Date().toISOString().split("T")[0];
+}
+
+function sessionHandle(session: object | null): string | undefined {
+  return (session as any)?.handle as string | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 // GET /api/goals?handle=X                    — fetch today's goals for handle
@@ -60,14 +65,16 @@ export async function GET(req: NextRequest) {
 // If proof_value is provided the goal is created as immediately completed (Work tab submission).
 // Direct completions bypass the 3-goal daily limit.
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { handle, goal_text, proof_type, proof_value, target_stat, is_public, template_id } = await req.json();
 
   if (!handle || !goal_text || !proof_type || !target_stat) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  const token = getAuthToken(req);
-  if (!(await verifyAuth(handle, token))) {
+  if (sessionHandle(session) !== handle) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -176,16 +183,12 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/goals — complete a goal with proof
 export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { handle: authHandle, goal_id, proof_value } = await req.json();
   if (!goal_id || !proof_value) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-  }
-
-  if (authHandle) {
-    const token = getAuthToken(req);
-    if (!(await verifyAuth(authHandle, token))) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
   }
 
   const db = getServiceSupabase();
@@ -199,6 +202,11 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (getError || !goal) return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+
+  // Verify the session user owns this goal
+  if (sessionHandle(session) !== goal.handle) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   // Mark completed
   const { data: updated, error: updateError } = await db
@@ -266,5 +274,6 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  void authHandle; // unused after session-based auth
   return NextResponse.json({ goal: updated, xp: xpResult });
 }

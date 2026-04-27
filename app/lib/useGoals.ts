@@ -29,7 +29,6 @@ export function useGoals(handle: string | null) {
     try {
       const res = await fetch(`/api/goals?handle=${encodeURIComponent(handle)}`);
       const data = await res.json();
-      console.log("GET goals response:", data);
       if (!res.ok) throw new Error(data.error || "Failed to fetch goals");
       setGoals(data.goals ?? []);
     } catch (e) {
@@ -54,14 +53,10 @@ export function useGoals(handle: string | null) {
       if (!handle) return;
       const res = await fetch("/api/goals", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-darkroom-token": localStorage.getItem("darkroom_token") || "",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ handle, goal_text, proof_type, target_stat, is_public, template_id }),
       });
       const data = await res.json();
-      console.log("POST goals response:", data);
       if (!res.ok) throw new Error(data.error || "Failed to add goal");
       await refetch();
       return data.goal as Goal;
@@ -74,10 +69,7 @@ export function useGoals(handle: string | null) {
       if (!handle) return null;
       const res = await fetch("/api/goals", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-darkroom-token": localStorage.getItem("darkroom_token") || "",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ handle, goal_id, proof_value }),
       });
       const data = await res.json();

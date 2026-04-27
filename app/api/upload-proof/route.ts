@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
-import { getAuthToken, verifyAuth } from "@/app/lib/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 
 const ALLOWED_MIME_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -11,6 +12,9 @@ const ALLOWED_MIME_TYPES: Record<string, string> = {
 const MAX_BYTES = 5 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const handle = formData.get("handle") as string | null;
@@ -19,10 +23,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing file or handle" }, { status: 400 });
   }
 
-  const token = getAuthToken(req);
-  if (!(await verifyAuth(handle, token))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const sessionHandle = (session as any).handle as string | undefined;
+  if (sessionHandle !== handle) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 413 });

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import Navbar from "../component/landing/Navbar";
 import CardGenerator from "../component/darkroom-id/CardGenerator";
 import { useGoals } from "../lib/useGoals";
@@ -418,10 +419,7 @@ function SettingsPanel({
     try {
       const res = await fetch("/api/settings", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-darkroom-token": localStorage.getItem("darkroom_token") || "",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ handle, profile_public: profilePublic, goals_public: goalsPublic, theme_accent: themeAccent }),
       });
       const data = await res.json();
@@ -705,7 +703,6 @@ function GoalCard({
         form.append("handle", handle);
         const res = await fetch("/api/upload-proof", {
           method: "POST",
-          headers: { "x-darkroom-token": localStorage.getItem("darkroom_token") || "" },
           body: form,
         });
         const data = await res.json();
@@ -1307,10 +1304,7 @@ function WorkTab({
     try {
       const res = await fetch("/api/goals", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-darkroom-token": localStorage.getItem("darkroom_token") || "",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           handle,
           goal_text: description,
@@ -1459,6 +1453,7 @@ function WorkTab({
 // ── MAIN PAGE ──────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const router = useRouter();
+  const { data: session, status: authStatus } = useSession();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -1498,17 +1493,14 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const handle = localStorage.getItem("darkroom_handle");
-    if (!handle) { router.replace("/darkroom-id"); return; }
+    if (authStatus === "loading") return;
+    if (authStatus === "unauthenticated") { router.replace("/login"); return; }
+    const handle = (session as any)?.handle as string | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (!handle) { router.replace("/login"); return; }
     if (localStorage.getItem("darkroom_onboarding_complete") !== "true") setOnboardingVisible(true); // eslint-disable-line react-hooks/set-state-in-effect
     if (localStorage.getItem("darkroom_shared") === "true") setHasShared(true); // eslint-disable-line react-hooks/set-state-in-effect
     fetchDashboard(handle);
-  }, [router, fetchDashboard]);
-
-  const disconnect = () => {
-    localStorage.removeItem("darkroom_handle");
-    router.push("/");
-  };
+  }, [authStatus, session, router, fetchDashboard]);
 
   const dismissOnboarding = useCallback(() => {
     localStorage.setItem("darkroom_onboarding_complete", "true");
@@ -1522,7 +1514,7 @@ export default function Dashboard() {
 
   const toggleStat = (key: string) => setExpandedStat((prev) => (prev === key ? null : key));
 
-  if (loading) {
+  if (authStatus === "loading" || loading) {
     return (
       <div className="min-h-screen bg-[#050508] text-white flex items-center justify-center">
         <div className="w-7 h-7 rounded-full border-2 border-white/15 border-t-white/60 animate-spin" />
@@ -1791,9 +1783,10 @@ export default function Dashboard() {
               </div>
             )}
 
-            <button onClick={disconnect}
+            <button
+              onClick={() => signOut({ callbackUrl: "/" })}
               className="w-full text-xs text-slate-500 hover:text-slate-300 transition-colors text-center py-2">
-              Disconnect
+              Sign out
             </button>
           </div>
         )}

@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Navbar from "../component/landing/Navbar";
 import CardGenerator from "../component/darkroom-id/CardGenerator";
 import type { DarkroomResult } from "../api/generate/route";
@@ -82,6 +83,10 @@ function LoadingStepRow({ label, status }: { label: string; status: StepStatus }
 function DarkroomIDContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session, status: authStatus } = useSession();
+
+  // Step 0 = handle input (shown briefly while session loads, then skipped)
+  // Step 1 = goals, Step 2 = loading/results
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(true);
   const [answers, setAnswers] = useState<Answers>({ handle: "", goals: [] });
@@ -94,7 +99,6 @@ function DarkroomIDContent() {
   const [referrerHandle, setReferrerHandle] = useState<string | null>(null);
   const [showAlreadyClaimed, setShowAlreadyClaimed] = useState(false);
   const [alreadyClaimedDays, setAlreadyClaimedDays] = useState(0);
-  const [checkingHandle, setCheckingHandle] = useState(false);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -103,28 +107,39 @@ function DarkroomIDContent() {
     if (ref && ref.length >= 2) setReferrerHandle(ref);
   }, [searchParams]);
 
+  // Redirect unauthenticated users; pre-fill handle and jump to goals if signed in
+  useEffect(() => {
+    if (authStatus === "loading") return;
+    if (authStatus === "unauthenticated") {
+      router.replace("/login");
+      return;
+    }
+    const handle = (session as any)?.handle as string | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (handle) {
+      setAnswers((prev) => ({ ...prev, handle }));
+      setStep(1);
+      setVisible(true);
+    }
+  }, [authStatus, session, router]);
+
+  // Check if handle is already claimed when session loads
+  useEffect(() => {
+    const handle = (session as any)?.handle as string | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (!handle) return;
+    fetch(`/api/check-claim?handle=${encodeURIComponent(handle)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.already_claimed && data.days_until_reclaim > 0) {
+          setAlreadyClaimedDays(data.days_until_reclaim);
+          setShowAlreadyClaimed(true);
+        }
+      })
+      .catch(() => {});
+  }, [session]);
+
   const goTo = (next: number) => {
     setVisible(false);
     setTimeout(() => { setStep(next); setVisible(true); }, 300);
-  };
-
-  const handleContinue = async () => {
-    if (answers.handle.length < 2 || checkingHandle) return;
-    setCheckingHandle(true);
-    try {
-      const res = await fetch(`/api/check-claim?handle=${encodeURIComponent(answers.handle)}`);
-      const data = await res.json();
-      if (data.already_claimed && data.days_until_reclaim > 0) {
-        setAlreadyClaimedDays(data.days_until_reclaim);
-        setShowAlreadyClaimed(true);
-        return;
-      }
-    } catch {
-      // If check fails, allow them to proceed
-    } finally {
-      setCheckingHandle(false);
-    }
-    goTo(1);
   };
 
   const toggleGoal = (value: string) => {
@@ -161,7 +176,6 @@ function DarkroomIDContent() {
     timersRef.current.push(safetyTimer);
 
     try {
-      console.log("CLIENT: calling /api/generate with", finalAnswers);
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,7 +191,6 @@ function DarkroomIDContent() {
       await new Promise((r) => setTimeout(r, 700));
       setResult(data);
     } catch (e) {
-      console.error("CLIENT: fetch error", e);
       clearTimers();
       if (!loadError) {
         setLoadError(true);
@@ -200,8 +213,9 @@ function DarkroomIDContent() {
     setErrorDetail("");
     setLoadingStep(0);
     setClaimState("idle");
-    setAnswers({ handle: "", goals: [] });
-    setStep(0);
+    const handle = (session as any)?.handle as string | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
+    setAnswers({ handle: handle ?? "", goals: [] });
+    setStep(1);
     setVisible(true);
   };
 
@@ -224,15 +238,10 @@ function DarkroomIDContent() {
         }),
       });
       const data = await res.json();
-      console.log("Claim response:", data);
       if (data.error === "reclaim_cooldown") {
         setClaimState("cooldown");
         setCooldownDays(data.days_remaining);
       } else if (data.success) {
-        localStorage.setItem("darkroom_handle", answers.handle);
-        if (data.token) {
-          localStorage.setItem("darkroom_token", data.token);
-        }
         if (referrerHandle) {
           fetch("/api/referrals", {
             method: "POST",
@@ -256,8 +265,17 @@ function DarkroomIDContent() {
     return "waiting";
   };
 
-  // Steps: 0 = handle, 1 = goals, 2 = loading/results
-  const progressWidth = `${(step / 2) * 100}%`;
+  // Show spinner while session is loading
+  if (authStatus === "loading") {
+    return (
+      <div className="min-h-screen bg-[#050508] flex items-center justify-center">
+        <div className="w-7 h-7 rounded-full border-2 border-white/15 border-t-white/60 animate-spin" />
+      </div>
+    );
+  }
+
+  // Progress bar: step 1 = 50%, step 2 = 100% (step 0 is skipped)
+  const progressWidth = step === 0 ? "0%" : step === 1 ? "50%" : "100%";
 
   return (
     <div className="min-h-screen bg-[#050508] text-white font-[family-name:var(--font-outfit)]">
@@ -291,23 +309,17 @@ function DarkroomIDContent() {
               </p>
               <div className="flex flex-col gap-3 w-full">
                 <button
-                  onClick={() => { localStorage.setItem("darkroom_handle", answers.handle); router.push("/dashboard"); }}
+                  onClick={() => router.push("/dashboard")}
                   className="w-full rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)]"
                 >
                   Go to Dashboard →
-                </button>
-                <button
-                  onClick={() => { setShowAlreadyClaimed(false); setAnswers((prev) => ({ ...prev, handle: "" })); }}
-                  className="rounded-xl border border-white/10 px-6 py-3 text-sm text-slate-300 hover:text-white hover:border-white/20 transition-all"
-                >
-                  Try another handle
                 </button>
               </div>
             </div>
           )}
 
-          {/* Screen 0: Handle input */}
-          {!showAlreadyClaimed && step === 0 && (
+          {/* Screen 1: Multi-select goals */}
+          {!showAlreadyClaimed && step === 1 && (
             <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
               {referrerHandle && (
                 <div className="mb-6 inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-full px-4 py-1.5">
@@ -315,44 +327,14 @@ function DarkroomIDContent() {
                   <span className="font-[family-name:var(--font-mono)] text-xs text-slate-200">@{referrerHandle}</span>
                 </div>
               )}
-              <h1 className="text-3xl font-extrabold tracking-tight text-white mb-3">
-                Drop your handle
-              </h1>
-              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] text-slate-400 uppercase mb-8">
-                we&apos;ll peek at your profile. no data stored.
-              </p>
-
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 mb-8 focus-within:border-white/20 transition-colors">
-                <span className="text-slate-400 font-[family-name:var(--font-mono)] text-sm">@</span>
-                <input
-                  type="text"
-                  value={answers.handle}
-                  onChange={(e) => setAnswers((prev) => ({ ...prev, handle: e.target.value }))}
-                  placeholder="yourhandle"
-                  className="flex-1 bg-transparent text-white placeholder:text-slate-500 outline-none text-sm font-[family-name:var(--font-mono)]"
-                  autoFocus
-                  onKeyDown={(e) => { if (e.key === "Enter") handleContinue(); }}
-                />
-              </div>
-
-              <button
-                onClick={handleContinue}
-                disabled={answers.handle.length < 2 || checkingHandle}
-                className="w-full rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-              >
-                {checkingHandle ? "Checking…" : "Continue →"}
-              </button>
-            </div>
-          )}
-
-          {/* Screen 1: Multi-select goals */}
-          {!showAlreadyClaimed && step === 1 && (
-            <div className={`transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
               <h2 className="text-2xl font-bold text-white mb-1 leading-snug">
                 What are you building toward?
               </h2>
-              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] text-slate-400 uppercase mb-6">
+              <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] text-slate-400 uppercase mb-2">
                 select all that apply
+              </p>
+              <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 mb-6">
+                Analyzing @{answers.handle}
               </p>
 
               <div className="flex flex-col gap-3 mb-8">
@@ -378,21 +360,13 @@ function DarkroomIDContent() {
                 })}
               </div>
 
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => goTo(0)}
-                  className="text-sm text-slate-300 hover:text-slate-200 transition-colors"
-                >
-                  ← Back
-                </button>
-                <button
-                  onClick={() => { goTo(2); submitQuiz(answers); }}
-                  disabled={answers.goals.length === 0}
-                  className="flex-1 rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-                >
-                  Get my ID →
-                </button>
-              </div>
+              <button
+                onClick={() => { goTo(2); submitQuiz(answers); }}
+                disabled={answers.goals.length === 0}
+                className="w-full rounded-xl bg-white px-7 py-3.5 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+              >
+                Get my ID →
+              </button>
             </div>
           )}
 

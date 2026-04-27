@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 
 async function upsertStreak(db: ReturnType<typeof getServiceSupabase>, handle: string) {
   const today = new Date().toISOString().split("T")[0];
@@ -52,7 +54,6 @@ async function awardReferralXp(
   db: ReturnType<typeof getServiceSupabase>,
   referred_handle: string
 ) {
-  // Check if this handle was referred
   const { data: referral } = await db
     .from("referrals")
     .select("referrer_handle, rewarded")
@@ -64,7 +65,6 @@ async function awardReferralXp(
   const referrer = referral.referrer_handle;
   const todayStr = new Date().toISOString().split("T")[0];
 
-  // Daily cap: max 25 XP from referrals per day
   const { data: todayEarnings } = await db
     .from("xp_earnings")
     .select("amount")
@@ -77,7 +77,6 @@ async function awardReferralXp(
 
   const xpAmount = Math.min(5, 25 - earnedToday);
 
-  // Award XP to referrer
   const { data: referrerRow } = await db
     .from("darkroom_ids")
     .select("bonus_points")
@@ -89,7 +88,6 @@ async function awardReferralXp(
     .update({ bonus_points: (referrerRow?.bonus_points ?? 0) + xpAmount })
     .eq("handle", referrer);
 
-  // Log XP earning
   await db.from("xp_earnings").insert({
     handle: referrer,
     source: "referral",
@@ -97,7 +95,6 @@ async function awardReferralXp(
     meta: { referred_handle },
   });
 
-  // Mark referral as rewarded
   await db
     .from("referrals")
     .update({ rewarded: true })
@@ -105,6 +102,9 @@ async function awardReferralXp(
 }
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json();
   const {
     handle,
@@ -119,6 +119,11 @@ export async function POST(req: NextRequest) {
 
   if (!handle || !score || !archetype) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  const sessionHandle = (session as any).handle as string | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (sessionHandle !== handle) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const db = getServiceSupabase();
@@ -155,7 +160,7 @@ export async function POST(req: NextRequest) {
 
     await upsertStreak(db, handle);
     await awardReferralXp(db, handle);
-    return NextResponse.json({ success: true, claimed: true, token: authToken });
+    return NextResponse.json({ success: true, claimed: true });
   }
 
   // Existing — check cooldown
@@ -195,5 +200,5 @@ export async function POST(req: NextRequest) {
   }
 
   await upsertStreak(db, handle);
-  return NextResponse.json({ success: true, reclaimed: true, claim_count: newCount, token: authToken });
+  return NextResponse.json({ success: true, reclaimed: true, claim_count: newCount });
 }

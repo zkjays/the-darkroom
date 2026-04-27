@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
-import { getAuthToken, verifyAuth } from "@/app/lib/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 
 export async function GET(req: NextRequest) {
   const handle = req.nextUrl.searchParams.get("handle");
@@ -22,15 +23,16 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json();
   const { handle, profile_public, goals_public, theme_accent } = body;
 
   if (!handle) return NextResponse.json({ error: "Missing handle" }, { status: 400 });
 
-  const token = getAuthToken(req);
-  if (!(await verifyAuth(handle, token))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const sessionHandle = (session as any).handle as string | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (sessionHandle !== handle) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const updates: Record<string, unknown> = {};
   if (typeof profile_public === "boolean") updates.profile_public = profile_public;

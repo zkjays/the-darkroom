@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 
 interface XPState {
   score: number;
@@ -25,16 +26,16 @@ function getXPCost(score: number): number {
 }
 
 export default function Navbar() {
+  const { data: session } = useSession();
   const [hovered, setHovered] = useState(false);
   const [visible, setVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
-  const [loggedIn, setLoggedIn] = useState(false);
   const [xp, setXP] = useState<XPState | null>(null);
 
+  const handle = (session as { handle?: string } | null)?.handle;
+
   useEffect(() => {
-    const handle = localStorage.getItem("darkroom_handle");
-    if (!handle) return;
-    setLoggedIn(true); // eslint-disable-line react-hooks/set-state-in-effect
+    if (!handle) { setXP(null); return; } // eslint-disable-line react-hooks/set-state-in-effect
     fetch(`/api/dashboard?handle=${encodeURIComponent(handle)}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
@@ -45,16 +46,15 @@ export default function Navbar() {
         setXP({ score, current: totalXP % cost, cost, accent: d.theme_accent ?? "cyan" });
       })
       .catch(() => {});
-  }, []);
+  }, [handle]);
 
-  const navLink = loggedIn
+  const navLink = handle
     ? { href: "/dashboard", text: "Dashboard →" }
-    : { href: "/darkroom-id", text: "Get ID →" };
+    : { href: "/login", text: "Sign in →" };
 
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-
       if (currentScrollY < 50) {
         setVisible(true);
       } else if (currentScrollY > lastScrollY) {
@@ -62,10 +62,8 @@ export default function Navbar() {
       } else {
         setVisible(true);
       }
-
       setLastScrollY(currentScrollY);
     };
-
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
