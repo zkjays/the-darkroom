@@ -80,7 +80,7 @@ export default function Navbar() {
           : "bg-transparent border-b border-white/2"
       }`}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 h-22">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 h-12">
         <Link href="/" className="transition hover:opacity-90">
           <Image
             src="/THEDR_logo_nobg.svg"
@@ -93,6 +93,12 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-4">
+          <Link
+            href="/opportunities"
+            className="hidden sm:block font-[family-name:var(--font-mono)] text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            Opportunities
+          </Link>
           {xp && (
             <div
               className="flex flex-col items-end gap-1"

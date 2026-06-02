@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 
 // GET /api/endorsements?goal_id=X
 export async function GET(req: NextRequest) {
@@ -26,11 +28,23 @@ export async function GET(req: NextRequest) {
 
 // POST /api/endorsements
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const sessionHandle = (session as { handle?: string }).handle;
+  if (!sessionHandle) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { goal_id, endorser_handle, type, reason } = await req.json();
 
   if (!goal_id || !endorser_handle || !type) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
+
+  // Security: endorser_handle must match authenticated session
+  if (sessionHandle !== endorser_handle) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   if (type !== "endorse" && type !== "challenge") {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   }

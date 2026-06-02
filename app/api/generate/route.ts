@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServiceSupabase } from "@/app/lib/supabase";
+import { sanitizeHandle } from "@/app/lib/sanitize";
+
+const generateRateLimit = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  const entry = generateRateLimit.get(key);
+  if (!entry || now > entry.resetAt) {
+    generateRateLimit.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= maxRequests) return false;
+  entry.count++;
+  return true;
+}
 
 export interface DarkroomResult {
   score: number;
+  totalScore?: number;
+  socialProof: number;
+  builderProof: number;
+  workProof: number;
   archetype: string;
   tagline: string;
-  stats: {
+  stats?: {
     focus: number;
     consistency: number;
     reliability: number;
@@ -13,23 +33,24 @@ export interface DarkroomResult {
   analysis: string;
   darkroom_line: string;
   profile_image_url?: string;
+  profileImageUrl?: string;
   isFallback?: boolean;
   warnings?: string[];
 }
 
 function getArchetype(score: number): string {
-  if (score >= 60) {
-    if (score >= 72) return "Ghost Builder";
-    if (score >= 66) return "Silent Architect";
+  if (score >= 50) {
+    if (score >= 62) return "Ghost Builder";
+    if (score >= 56) return "Silent Architect";
     return "Shadow Operator";
   }
-  if (score >= 45) {
-    if (score >= 55) return "Half Built";
-    if (score >= 50) return "Curious Lurker";
+  if (score >= 32) {
+    if (score >= 44) return "Half Built";
+    if (score >= 38) return "Curious Lurker";
     return "Almost Based";
   }
-  if (score >= 40) return "Main Character Loading";
-  if (score >= 35) return "Fresh Compile";
+  if (score >= 22) return "Main Character Loading";
+  if (score >= 14) return "Fresh Compile";
   return "NPC (for now)";
 }
 
@@ -38,28 +59,27 @@ function getFallbackResult(
   goals: string[],
   warnings: string[] = []
 ): DarkroomResult {
-  let focus = 25, consistency = 25, reliability = 25, growth = 25;
+  let socialProof = 35;
+  let builderProof = 35;
+  const workProof = 0;
 
   for (const goal of goals) {
-    if (goal === "brand")     { focus += 5;  consistency += 5; }
-    if (goal === "skills")    { focus += 8;  growth += 5; }
-    if (goal === "project")   { focus += 10; reliability += 5; }
-    if (goal === "community") { reliability += 8; consistency += 5; }
-    if (goal === "freedom")   { growth += 5; consistency += 3; }
-    if (goal === "exploring") { growth += 8; }
+    if (goal === "brand")     { socialProof += 5; }
+    if (goal === "skills")    { builderProof += 8; }
+    if (goal === "project")   { builderProof += 10; }
+    if (goal === "community") { socialProof += 8; }
+    if (goal === "freedom")   { builderProof += 4; }
+    if (goal === "exploring") { builderProof += 5; }
   }
 
   if (/build|dev|ship|hack|code/i.test(handle)) {
-    reliability += 5;
-    focus += 5;
+    builderProof += 8;
   }
 
-  focus       = Math.min(75, Math.max(15, focus));
-  consistency = Math.min(75, Math.max(15, consistency));
-  reliability = Math.min(75, Math.max(15, reliability));
-  growth      = Math.min(75, Math.max(15, growth));
+  socialProof  = Math.min(100, Math.max(0, socialProof));
+  builderProof = Math.min(100, Math.max(0, builderProof));
 
-  const score = Math.min(75, Math.max(30, Math.round((focus + consistency + reliability + growth) / 4)));
+  const score = Math.round((socialProof * 0.35) + (builderProof * 0.35) + (workProof * 0.30));
   const archetype = getArchetype(score);
 
   const taglines: Record<string, string> = {
@@ -90,9 +110,12 @@ function getFallbackResult(
 
   return {
     score,
+    totalScore: score,
+    socialProof,
+    builderProof,
+    workProof,
     archetype,
     tagline: taglines[archetype] ?? "built different",
-    stats: { focus, consistency, reliability, growth },
     analysis: `@${handle} — you're building toward ${goalLabels}. The profile tells a story of someone who hasn't stopped moving. The darkroom sees the pattern and it's early days in a long game.`,
     darkroom_line: lines[archetype] ?? "Welcome to the darkroom.",
     isFallback: true,
@@ -102,10 +125,16 @@ function getFallbackResult(
 
 export async function POST(req: NextRequest) {
   console.log("API ROUTE HIT", new Date().toISOString());
-  const { handle, goals } = await req.json();
+  const { handle: rawHandle, goals } = await req.json();
+  const handle = sanitizeHandle(rawHandle ?? "");
 
   if (!handle || !goals || !Array.isArray(goals) || goals.length === 0) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  }
+
+  if (!checkRateLimit(handle, 3, 60 * 60 * 1000)) {
+    console.warn(`generate: rate limit hit for handle=${handle}`);
+    return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429 });
   }
 
   const bearerToken = process.env.BEARER_TOKEN;
@@ -269,69 +298,51 @@ ${replyTweets.length > 0 ? replyTweets.map((t, i) => `${i + 1}. ${t}`).join("\n"
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
         temperature: 0.3,
-        system: `You are The Darkroom ID generator. Analyze the user's X profile data and their stated goals to create a builder personality profile.
+        system: `You are The Darkroom ID generator. Analyze the user's X profile data and their stated goals to produce a builder identity score across two dimensions.
 
 The user selected their building goals from: brand, skills, project, community, freedom, exploring. They may have selected multiple.
 
-You receive two sets of tweets: ORIGINAL TWEETS (what they post themselves) and REPLIES (how they engage with others). Don't just count them — analyze the SUBSTANCE.
+You receive two sets of tweets: ORIGINAL TWEETS (what they post) and REPLIES (how they engage). Analyze SUBSTANCE, not volume.
 
-For ORIGINAL TWEETS, assess:
-- Are they about building, shipping, learning? → high signal
-- Are they shitposts, gms, generic motivational content? → low signal
-- Do they share work, links, projects, technical insights? → very high signal
-- Length and depth — long thoughtful tweets beat one-liners
+--- DIMENSION 1: social_proof (0–100) ---
+Evidence that this person has a real, engaged presence in a community.
+High signals: meaningful follower count, thoughtful replies to others, mentions of community involvement, consistent engagement, people responding to their content.
+Low signals: gm/lfg noise, one-way broadcast with no replies, brand-new accounts, fake-looking metrics.
+Score 0-100. 50 = average active user. 80+ = clearly respected in their space.
 
-For REPLIES, assess:
-- Are they substantive (insights, questions, helping others)? → high reliability
-- Are they 'gm', 'lfg', 'this', 'agree', 'based'? → low signal noise
-- Do they show technical knowledge or genuine engagement? → high signal
-- A user with 100 'gm' replies has very different reliability than one with 20 thoughtful replies
+--- DIMENSION 2: builder_proof (0–100) ---
+Evidence that this person actually builds things.
+High signals: tweets about shipping projects, technical insights, learning in public, sharing work/links, bio mentions of roles/tools/products, long-form thoughtful content about making things.
+Low signals: generic motivation, shitposts, retweet-only behavior, no mention of projects or output in bio or tweets.
+Score 0-100. 50 = someone who talks about building. 80+ = someone clearly shipping.
 
-QUALITY OVER QUANTITY: A user with 5 substantive original tweets about their build is MORE of a builder than someone with 50 motivational tweets. A user with 10 deep replies is MORE reliable than someone with 100 'gm' replies. Volume without substance means low scores.
+QUALITY OVER QUANTITY: 5 substantive build tweets > 50 gm tweets. Be calibrated — most users score 20–55. Reserve 70+ for genuinely impressive profiles.
 
-SCORING GUIDANCE:
-- High focus: original tweets are about specific topics, deep, technical, consistent subject matter
-- High reliability: replies show real engagement — questions, help, insights — not noise
-- High growth: original content quality improving, learning in public, teaching others
-- High consistency: regular substantive activity, not sporadic bursts of fluff
+YOUR TONE: A robot mentor that roasts with love. Sharp and observational, slightly ironic, always opening a door. The user should feel SEEN and READY — not deflated. Avoid: "fails", "lacks", "weak", "poor". Use: "potential", "could", "the gap is", "ready to".
 
-YOUR TONE: A robot mentor that roasts with love. Sharp and observational, slightly ironic, but always opening a door. You're the friend who tells them the truth BECAUSE you believe in them. The user should finish reading feeling SEEN and READY — not deflated. Specific beats generic. Warmth beats cruelty. Avoid: "fails", "lacks", "weak", "poor". Use: "potential", "could", "next step", "the gap is", "ready to".
+GOAL SIGNALS (let selected goals inform but not override the tweet evidence):
+- brand + project = expect higher builder_proof
+- community = expect higher social_proof
+- skills + exploring = early-stage builder, calibrate builder_proof accordingly
+- freedom + project = high ambition signal, check if tweets back it up
 
-METRICS to score (each 15-75, this is a quiz-only score, bonus points from lessons/certs come later):
-- focus: How deep and specialized is this person? Do their tweets and bio show expertise in specific areas or are they scattered? Consistent topics = high. Random everything = low.
-- consistency: How regularly do they show up? Tweet frequency, account age vs activity ratio. Daily grinder = high. Ghost who tweets once a month = low.
-- reliability: Could a project hire this person? Professional tone, constructive engagement, mentions of real work/roles in bio, transparent about their journey. Shill-only accounts = low.
-- growth: Real growth potential, not vanity. Engagement quality over follower count. Learning-oriented content, helping others, improving over time = high. Stagnant or fake engagement = low.
+ARCHETYPES (pick ONE based on combined score = (social_proof × 0.35) + (builder_proof × 0.35)):
+High tier (50-70): 'Ghost Builder' (ships in the dark, drops in the light), 'Silent Architect' (the blueprint speaks for itself), 'Shadow Operator' (you won't see me, but you'll see my work)
+Mid tier (32-49): 'Half Built' (foundation solid, still stacking floors), 'Curious Lurker' (reads everything, ships soon), 'Almost Based' (one commit away from greatness)
+Low tier (0-31): 'Main Character Loading' (the arc hasn't even started), 'Fresh Compile' (first build, first bugs, first glory), 'NPC (for now)' (everyone's origin story starts somewhere)
 
-GOAL SIGNALS (how their selected goals influence scoring):
-- brand + project = high focus, high reliability
-- skills + exploring = high growth
-- community + brand = high reliability, high consistency
-- freedom + skills = high growth, high focus
-- project alone = highest focus
-- exploring alone = honest, boost growth slightly
-- Many goals selected = ambitious but possibly scattered, moderate focus
-
-ARCHETYPES (pick ONE based on total score):
-High tier (60-75): 'Silent Architect' (the blueprint speaks for itself), 'Ghost Builder' (ships in the dark, drops in the light), 'Shadow Operator' (you won't see me, but you'll see my work)
-Mid tier (45-59): 'Half Built' (foundation solid, still stacking floors), 'Curious Lurker' (reads everything, ships soon), 'Almost Based' (one commit away from greatness)
-Low tier (30-44): 'Main Character Loading' (the arc hasn't even started), 'Fresh Compile' (first build, first bugs, first glory), 'NPC (for now)' (everyone's origin story starts somewhere)
-
-TAGLINE RULES (max 8 words):
-- Sharp and specific to their actual profile — not generic
-- Witty observation, NEVER cruel
-- Should make them smile, not feel attacked
-- The energy: "I see you, and I'm rooting for you"
-- Examples of the right vibe: 'more potential than tweets suggest', 'the receipts are coming, just not yet', 'louder than your output, for now', 'all the ingredients, missing the recipe', 'shipping while they sleep', 'all signal, zero noise'
-- NEVER mention privacy, ZK, proof, or crypto generically
+TAGLINE RULES (max 8 words, specific to this profile):
+- Sharp observation, NEVER cruel. Energy: "I see you and I'm rooting for you."
+- Examples: 'more potential than tweets suggest', 'the receipts are coming, just not yet', 'shipping while they sleep', 'all signal, zero noise'
+- NEVER mention privacy, ZK, proof, or crypto generically.
 
 ANALYSIS RULES (exactly 3 sentences):
-- Sentence 1: A sharp but WARM observation that surprises them — something specific from their actual tweets or bio, delivered like a friend who noticed something they might have missed
-- Sentence 2: The honest gap — name what's missing or underused right now, with zero sugar-coating but zero cruelty either; frame it as "the gap is X" not "you fail at X"
-- Sentence 3: A clear, actionable path forward — end on HOPE, motivation, and a specific door they can open tomorrow; always leave them feeling ready to act
+- Sentence 1: Warm, specific observation from their actual tweets or bio — something they might have missed about themselves.
+- Sentence 2: The honest gap — frame as "the gap is X" not "you fail at X".
+- Sentence 3: Clear actionable path forward — end on hope and a specific door they can open tomorrow.
 
 Respond ONLY with JSON (no markdown, no backticks):
-{"score": <30-75>, "archetype": "<exact name from list>", "tagline": "<max 8 words, specific and witty>", "stats": {"focus": <15-75>, "consistency": <15-75>, "reliability": <15-75>, "growth": <15-75>}, "analysis": "<3 sentences following the rules above>", "darkroom_line": "<One Darkroom themed line about building. NEVER mention privacy or ZK. Focus on builder mindset.>"}`,
+{"social_proof": <0-100>, "builder_proof": <0-100>, "archetype": "<exact name from list>", "tagline": "<max 8 words>", "analysis": "<3 sentences>", "darkroom_line": "<One Darkroom-themed line about building. Focus on builder mindset. Never mention privacy or ZK.>"}`,
         messages: [{ role: "user", content: userMessage }],
       }),
       signal: claudeController.signal,
@@ -346,10 +357,46 @@ Respond ONLY with JSON (no markdown, no backticks):
 
     const claudeData = await claudeRes.json();
     const raw = claudeData.content?.[0]?.text ?? "";
-    const result: DarkroomResult = JSON.parse(raw);
-    result.warnings = warnings.length > 0 ? warnings : undefined;
-    result.profile_image_url = profileImageUrl || undefined;
-    return NextResponse.json(result);
+    const parsed = JSON.parse(raw) as {
+      social_proof: number;
+      builder_proof: number;
+      archetype: string;
+      tagline: string;
+      analysis: string;
+      darkroom_line: string;
+    };
+
+    const socialProof  = Math.min(100, Math.max(0, Math.round(parsed.social_proof)));
+    const builderProof = Math.min(100, Math.max(0, Math.round(parsed.builder_proof)));
+    const workProof    = 0;
+    const baseScore    = Math.round((socialProof * 0.35) + (builderProof * 0.35) + (workProof * 0.30));
+    const totalScore   = baseScore;
+
+    try {
+      const supabase = getServiceSupabase();
+      await supabase.from("darkroom_ids").upsert(
+        { handle, social_proof: socialProof, builder_proof: builderProof, work_proof: workProof, score: baseScore, total_score: totalScore },
+        { onConflict: "handle" }
+      );
+    } catch (dbErr) {
+      console.log("Supabase upsert failed (non-fatal):", dbErr);
+    }
+
+    return NextResponse.json({
+      handle,
+      score: baseScore,
+      totalScore,
+      socialProof,
+      builderProof,
+      workProof,
+      archetype: parsed.archetype,
+      tagline: parsed.tagline,
+      analysis: parsed.analysis,
+      darkroom_line: parsed.darkroom_line,
+      profileImageUrl: profileImageUrl || undefined,
+      profile_image_url: profileImageUrl || undefined,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    });
   } catch (e) {
     clearTimeout(claudeTimeout);
     const reason = e instanceof Error && e.name === "AbortError"

@@ -106,22 +106,21 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
+  // Security: never trust client-provided scores — use DB values set by /api/generate
   const {
     handle,
-    score,
     archetype,
     tagline,
-    stats,
     analysis,
     darkroom_line,
     profile_image_url,
   } = body;
 
-  if (!handle || !score || !archetype) {
+  if (!handle || !archetype) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const sessionHandle = (session as any).handle as string | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const sessionHandle = session.handle;
   if (sessionHandle !== handle) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -138,15 +137,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
+  // Use scores from DB (set by /api/generate upsert) — never from request body
+  const dbScore = existing?.score ?? 0;
+  const dbSocialProof = existing?.social_proof ?? 0;
+  const dbBuilderProof = existing?.builder_proof ?? 0;
+  const dbWorkProof = existing?.work_proof ?? 0;
+
   // New claim
   if (!existing) {
     const authToken = crypto.randomUUID();
     const { error: insertError } = await db.from("darkroom_ids").insert({
       handle,
-      score,
+      score: dbScore,
       archetype,
       tagline,
-      stats,
+      social_proof: dbSocialProof,
+      builder_proof: dbBuilderProof,
+      work_proof: dbWorkProof,
       analysis,
       darkroom_line,
       profile_image_url: profile_image_url ?? null,
@@ -182,10 +189,12 @@ export async function POST(req: NextRequest) {
   const { error: updateError } = await db
     .from("darkroom_ids")
     .update({
-      score,
+      score: dbScore,
       archetype,
       tagline,
-      stats,
+      social_proof: dbSocialProof,
+      builder_proof: dbBuilderProof,
+      work_proof: dbWorkProof,
       analysis,
       darkroom_line,
       profile_image_url: profile_image_url ?? null,

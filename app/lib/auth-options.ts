@@ -35,9 +35,9 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }: { session: Session; token: JWT }) {
-      (session as Session & { handle: string; xId: string; profileImage: string }).handle = token.handle as string;
-      (session as Session & { handle: string; xId: string; profileImage: string }).xId = token.xId as string;
-      (session as Session & { handle: string; xId: string; profileImage: string }).profileImage = token.profileImage as string;
+      session.handle = token.handle;
+      session.xId = token.xId;
+      session.profileImage = token.profileImage;
       return session;
     },
   },
