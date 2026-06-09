@@ -356,7 +356,7 @@ Respond ONLY with JSON (no markdown, no backticks):
       try {
         const supabase = getServiceSupabase();
         await supabase.from("darkroom_ids").upsert(
-          { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, total_score: fallback.score },
+          { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, total_score: fallback.score, generate_at: new Date().toISOString() },
           { onConflict: "handle" }
         );
       } catch (dbErr) { console.log("Supabase upsert (fallback) failed:", dbErr); }
@@ -416,7 +416,7 @@ Respond ONLY with JSON (no markdown, no backticks):
     try {
       const supabase = getServiceSupabase();
       await supabase.from("darkroom_ids").upsert(
-        { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, total_score: fallback.score },
+        { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, total_score: fallback.score, generate_at: new Date().toISOString() },
         { onConflict: "handle" }
       );
     } catch (dbErr) { console.log("Supabase upsert (fallback) failed:", dbErr); }
