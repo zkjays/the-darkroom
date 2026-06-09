@@ -10,7 +10,7 @@ export default function LoginPage() {
   const handleSignIn = async () => {
     setLoading(true);
     await signIn("twitter", {
-      callbackUrl: "http://localhost:3000/darkroom-id"
+      callbackUrl: "/darkroom-id"
     });
   };
 

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useState, useEffect, useRef } from "react";
+import { useSession, signOut } from "next-auth/react";
 
 interface XPState {
   score: number;
@@ -31,6 +31,18 @@ export default function Navbar() {
   const [visible, setVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [xp, setXP] = useState<XPState | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handle = (session as { handle?: string } | null)?.handle;
 
@@ -117,12 +129,47 @@ export default function Navbar() {
               </div>
             </div>
           )}
-          <Link
-            href={navLink.href}
-            className="text-sm text-white/60 transition hover:text-white"
-          >
-            {navLink.text}
-          </Link>
+          {handle ? (
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                className="text-sm text-white/60 transition hover:text-white flex items-center gap-1"
+              >
+                Dashboard →
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-40 bg-[#0c0c14] border border-white/10 rounded-xl overflow-hidden shadow-xl z-50">
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setMenuOpen(false)}
+                    className="block px-4 py-2.5 text-xs font-mono text-slate-300 hover:bg-white/[0.06] hover:text-white transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href={`/p/${handle}`}
+                    onClick={() => setMenuOpen(false)}
+                    className="block px-4 py-2.5 text-xs font-mono text-slate-300 hover:bg-white/[0.06] hover:text-white transition-colors"
+                  >
+                    My profile
+                  </Link>
+                  <button
+                    onClick={() => { setMenuOpen(false); signOut({ callbackUrl: "/" }); }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-mono text-red-400/70 hover:bg-white/[0.06] hover:text-red-400 transition-colors border-t border-white/[0.06]"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="text-sm text-white/60 transition hover:text-white"
+            >
+              Sign in →
+            </Link>
+          )}
         </div>
       </div>
     </header>
