@@ -70,6 +70,7 @@ function DarkroomIDContent() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [claimState, setClaimState] = useState<"idle" | "loading" | "cooldown">("idle");
   const [cooldownDays, setCooldownDays] = useState(0);
+  const [isReclaim, setIsReclaim] = useState(false);
   const [referrerHandle, setReferrerHandle] = useState<string | null>(null);
   const [showAlreadyClaimed, setShowAlreadyClaimed] = useState(false);
   const [alreadyClaimedDays, setAlreadyClaimedDays] = useState(0);
@@ -103,11 +104,21 @@ function DarkroomIDContent() {
       .then((r) => r.json())
       .then((data) => {
         if (data.already_claimed && data.days_until_reclaim > 0) {
+          // Cooldown active — block reclaim
           setAlreadyClaimedDays(data.days_until_reclaim);
           setShowAlreadyClaimed(true);
+        } else if (data.already_claimed && data.days_until_reclaim === 0) {
+          // Free reclaim (V1 user or post-cooldown) — skip goals, auto-run analysis
+          setIsReclaim(true);
+          const autoAnswers = { handle, goals: [] };
+          setAnswers(autoAnswers);
+          setStep(2);
+          setVisible(true);
+          submitQuiz(autoAnswers);
         }
       })
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   const goTo = (next: number) => {
@@ -367,7 +378,7 @@ function DarkroomIDContent() {
                   disabled={claimState === "loading"}
                   className="font-[family-name:var(--font-mono)] text-xs px-4 py-2 rounded-lg border border-cyan-400/40 text-cyan-400 hover:bg-cyan-400/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {claimState === "loading" ? "Claiming…" : "Claim your ID"}
+                  {claimState === "loading" ? "Updating…" : isReclaim ? "Update your ID" : "Claim your ID"}
                 </button>
               )}
               <button
