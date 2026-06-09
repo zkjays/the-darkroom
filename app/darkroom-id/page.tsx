@@ -235,7 +235,7 @@ function DarkroomIDContent() {
             body: JSON.stringify({ referrer_handle: referrerHandle, referred_handle: answers.handle }),
           }).catch(() => {});
         }
-        router.push("/dashboard");
+        window.location.href = "/dashboard";
       } else {
         setClaimState("idle");
       }
