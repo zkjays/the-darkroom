@@ -173,8 +173,10 @@ export async function POST(req: NextRequest) {
   // Existing — check cooldown
   const updatedAt = new Date(existing.updated_at);
   const daysSince = (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24);
+  // V2 launch: first-time claimers (V1 users) get one free reclaim — bypass cooldown
+  const isV2FreeClaim = (existing.claim_count ?? 1) === 1;
 
-  if (daysSince < 30) {
+  if (!isV2FreeClaim && daysSince < 30) {
     const daysRemaining = Math.ceil(30 - daysSince);
     return NextResponse.json({
       success: false,
@@ -201,6 +203,7 @@ export async function POST(req: NextRequest) {
       claim_count: newCount,
       updated_at: new Date().toISOString(),
       auth_token: authToken,
+      is_og: isV2FreeClaim ? true : (existing?.is_og ?? false),
     })
     .eq("handle", handle);
 

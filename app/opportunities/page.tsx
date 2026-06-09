@@ -187,7 +187,12 @@ function EmptyState({ category }: { category: string }) {
         No {category === "all" ? "" : category} opportunities right now.
       </p>
       <p className="font-[family-name:var(--font-mono)] text-slate-700 text-xs">
-        New opportunities are added every morning.
+        First opportunities coming this week —{" "}
+        <a href="https://x.com/zkjays" target="_blank" rel="noopener noreferrer"
+           className="text-slate-500 hover:text-slate-300 transition-colors underline underline-offset-2">
+          DM @zkjays
+        </a>{" "}
+        if you&apos;re hiring.
       </p>
     </div>
   );

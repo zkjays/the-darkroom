@@ -19,6 +19,7 @@ interface ProfileData {
   streak: { current_streak: number } | null;
   profile_public: boolean;
   open_to_opportunities?: boolean;
+  is_og?: boolean;
 }
 
 interface WorkProof {
@@ -202,6 +203,11 @@ export default function PublicProfile() {
               {data.open_to_opportunities && (
                 <span className="mt-1 self-start font-[family-name:var(--font-mono)] text-xs px-2.5 py-1 rounded-full border border-emerald-500/40 text-emerald-400 bg-emerald-500/10">
                   ◈ Open to opportunities
+                </span>
+              )}
+              {data.is_og && (
+                <span className="mt-1 self-start font-[family-name:var(--font-mono)] text-xs px-2.5 py-1 rounded-full border border-amber-500/40 text-amber-400 bg-amber-500/10">
+                  ◈ OG Builder
                 </span>
               )}
             </div>

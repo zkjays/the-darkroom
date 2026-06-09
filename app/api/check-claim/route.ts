@@ -18,12 +18,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ already_claimed: false, days_until_reclaim: 0 });
   }
 
+  const claimCount = data.claim_count ?? 1;
   const daysSince = (Date.now() - new Date(data.updated_at).getTime()) / (1000 * 60 * 60 * 24);
-  const daysUntilReclaim = Math.max(0, Math.ceil(30 - daysSince));
+  // V2 launch: first-time claimers (V1 users) get one free reclaim regardless of cooldown
+  const daysUntilReclaim = claimCount === 1 ? 0 : Math.max(0, Math.ceil(30 - daysSince));
 
   return NextResponse.json({
     already_claimed: true,
     days_until_reclaim: daysUntilReclaim,
-    claim_count: data.claim_count ?? 1,
+    claim_count: claimCount,
   });
 }
