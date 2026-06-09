@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existing, error: fetchError } = await db
     .from("darkroom_ids")
-    .select("*, generate_at")
+    .select("*")
     .eq("handle", handle)
     .single();
 
