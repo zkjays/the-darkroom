@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth-options";
+import { sanitizeHandle } from "@/app/lib/sanitize";
 
 async function upsertStreak(db: ReturnType<typeof getServiceSupabase>, handle: string) {
   const today = new Date().toISOString().split("T")[0];
@@ -108,7 +109,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   // Security: never trust client-provided scores — use DB values set by /api/generate
   const {
-    handle,
+    handle: rawHandle,
     archetype,
     tagline,
     analysis,
@@ -116,11 +117,13 @@ export async function POST(req: NextRequest) {
     profile_image_url,
   } = body;
 
+  const handle = sanitizeHandle(rawHandle ?? "");
+
   if (!handle || !archetype) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const sessionHandle = session.handle;
+  const sessionHandle = sanitizeHandle(session.handle ?? "");
   if (sessionHandle !== handle) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
