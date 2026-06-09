@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const db = getServiceSupabase();
   const { data, error } = await db
     .from("darkroom_ids")
-    .select("updated_at, claim_count")
+    .select("updated_at, claim_count, social_proof, builder_proof")
     .eq("handle", handle)
     .single();
 
@@ -20,8 +20,12 @@ export async function GET(req: NextRequest) {
 
   const claimCount = data.claim_count ?? 1;
   const daysSince = (Date.now() - new Date(data.updated_at).getTime()) / (1000 * 60 * 60 * 24);
-  // V2 launch: first-time claimers (V1 users) get one free reclaim regardless of cooldown
-  const daysUntilReclaim = claimCount === 1 ? 0 : Math.max(0, Math.ceil(30 - daysSince));
+  const scoresAreZero = (data.social_proof ?? 0) === 0 && (data.builder_proof ?? 0) === 0;
+
+  // Free reclaim if: V1 user (count=1), OR scores never set (=0 regardless of count)
+  const daysUntilReclaim = (claimCount === 1 || scoresAreZero)
+    ? 0
+    : Math.max(0, Math.ceil(30 - daysSince));
 
   return NextResponse.json({
     already_claimed: true,

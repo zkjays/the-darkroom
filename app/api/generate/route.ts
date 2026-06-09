@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
   const { handle: rawHandle, goals } = await req.json();
   const handle = sanitizeHandle(rawHandle ?? "");
 
-  if (!handle || !goals || !Array.isArray(goals) || goals.length === 0) {
+  if (!handle || !goals || !Array.isArray(goals)) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
@@ -352,7 +352,15 @@ Respond ONLY with JSON (no markdown, no backticks):
     if (!claudeRes.ok) {
       console.log("Fallback: using deterministic scoring (Claude returned", claudeRes.status, ")");
       warnings.push(`claude_api_failed: AI generation failed (${claudeRes.status}), using fallback scoring`);
-      return NextResponse.json({ ...getFallbackResult(handle, goals, warnings), profile_image_url: profileImageUrl || undefined });
+      const fallback = getFallbackResult(handle, goals, warnings);
+      try {
+        const supabase = getServiceSupabase();
+        await supabase.from("darkroom_ids").upsert(
+          { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, total_score: fallback.score },
+          { onConflict: "handle" }
+        );
+      } catch (dbErr) { console.log("Supabase upsert (fallback) failed:", dbErr); }
+      return NextResponse.json({ ...fallback, profile_image_url: profileImageUrl || undefined });
     }
 
     const claudeData = await claudeRes.json();
@@ -404,6 +412,14 @@ Respond ONLY with JSON (no markdown, no backticks):
       : e instanceof Error ? e.message : "AI generation failed";
     console.log("Fallback: using deterministic scoring —", reason);
     warnings.push(`claude_api_failed: ${reason}, using fallback scoring`);
-    return NextResponse.json({ ...getFallbackResult(handle, goals, warnings), profile_image_url: profileImageUrl || undefined });
+    const fallback = getFallbackResult(handle, goals, warnings);
+    try {
+      const supabase = getServiceSupabase();
+      await supabase.from("darkroom_ids").upsert(
+        { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, total_score: fallback.score },
+        { onConflict: "handle" }
+      );
+    } catch (dbErr) { console.log("Supabase upsert (fallback) failed:", dbErr); }
+    return NextResponse.json({ ...fallback, profile_image_url: profileImageUrl || undefined });
   }
 }
