@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { sanitizeHandle } from "@/app/lib/sanitize";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const handle = sanitizeHandle(req.nextUrl.searchParams.get("handle") ?? "");
 
