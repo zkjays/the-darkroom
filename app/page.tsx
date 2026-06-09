@@ -4,10 +4,12 @@ import PhaseTeaser from "@/app/component/landing/PhaseTeaser";
 import Footer from "@/app/component/landing/Footer";
 import Particles from "@/app/component/landing/Particles";
 import MouseGlow from "@/app/component/landing/MouseGlow";
+import CountdownBanner from "@/app/component/landing/CountdownBanner";
 
 export default function Home() {
   return (
     <main className="min-h-screen">
+      <CountdownBanner />
       <div className="relative overflow-hidden bg-[#050508]">
 
         {/* === DEPTH LAYER: Ambient orb glows === */}
