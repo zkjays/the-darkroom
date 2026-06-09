@@ -8,7 +8,7 @@ export async function GET() {
 
   // Test exact same upsert as generate route (claude success path)
   const { error: e1 } = await db.from("darkroom_ids").upsert(
-    { handle: "__debug__", social_proof: 55, builder_proof: 60, work_proof: 0, score: 40, generate_at: new Date().toISOString() },
+    { handle: "__debug__", social_proof: 55, builder_proof: 60, work_proof: 0, score: 40, archetype: "Ghost Builder", tagline: "ships in the dark", darkroom_line: "The work speaks.", analysis: "Test analysis.", generate_at: new Date().toISOString() },
     { onConflict: "handle" }
   );
 

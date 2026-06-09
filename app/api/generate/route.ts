@@ -269,7 +269,7 @@ export async function POST(req: NextRequest) {
     try {
       const supabase = getServiceSupabase();
       const { error: upsertErr } = await supabase.from("darkroom_ids").upsert(
-        { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, generate_at: new Date().toISOString() },
+        { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, archetype: fallback.archetype, tagline: fallback.tagline, darkroom_line: fallback.darkroom_line, analysis: fallback.analysis, generate_at: new Date().toISOString() },
         { onConflict: "handle" }
       );
       if (upsertErr) console.error("Supabase upsert (no-key fallback) failed:", JSON.stringify(upsertErr));
@@ -364,10 +364,11 @@ Respond ONLY with JSON (no markdown, no backticks):
       const fallback = getFallbackResult(handle, goals, warnings);
       try {
         const supabase = getServiceSupabase();
-        await supabase.from("darkroom_ids").upsert(
-          { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, generate_at: new Date().toISOString() },
+        const { error: upsertErr } = await supabase.from("darkroom_ids").upsert(
+          { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, archetype: fallback.archetype, tagline: fallback.tagline, darkroom_line: fallback.darkroom_line, analysis: fallback.analysis, generate_at: new Date().toISOString() },
           { onConflict: "handle" }
         );
+        if (upsertErr) console.error("Supabase upsert (claude-fail fallback) failed:", JSON.stringify(upsertErr));
       } catch (dbErr) { console.log("Supabase upsert (fallback) failed:", dbErr); }
       return NextResponse.json({ ...fallback, profile_image_url: profileImageUrl || undefined });
     }
@@ -391,12 +392,13 @@ Respond ONLY with JSON (no markdown, no backticks):
 
     try {
       const supabase = getServiceSupabase();
-      await supabase.from("darkroom_ids").upsert(
-        { handle, social_proof: socialProof, builder_proof: builderProof, work_proof: workProof, score: baseScore, generate_at: new Date().toISOString() },
+      const { error: upsertErr } = await supabase.from("darkroom_ids").upsert(
+        { handle, social_proof: socialProof, builder_proof: builderProof, work_proof: workProof, score: baseScore, archetype: parsed.archetype, tagline: parsed.tagline, darkroom_line: parsed.darkroom_line, analysis: parsed.analysis, generate_at: new Date().toISOString() },
         { onConflict: "handle" }
       );
+      if (upsertErr) console.error("Supabase upsert (claude success) error:", JSON.stringify(upsertErr));
     } catch (dbErr) {
-      console.error("Supabase upsert (claude success) failed:", JSON.stringify(dbErr));
+      console.error("Supabase upsert (claude success) exception:", JSON.stringify(dbErr));
     }
 
     return NextResponse.json({
