@@ -176,10 +176,11 @@ export async function POST(req: NextRequest) {
   // Existing — check cooldown
   const updatedAt = new Date(existing.updated_at);
   const daysSince = (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24);
-  // Free reclaim if: V1 user (count=1), OR generate just ran within last 30 min
+  // Free reclaim if: V1 user (count=1), OR generate just ran within last 30 min, OR scores are still 0
   const generateAt = existing.generate_at ? new Date(existing.generate_at) : null;
   const minutesSinceGenerate = generateAt ? (Date.now() - generateAt.getTime()) / (1000 * 60) : Infinity;
-  const isV2FreeClaim = (existing.claim_count ?? 1) === 1 || minutesSinceGenerate < 30;
+  const scoresAreZero = (existing.social_proof ?? 0) === 0 && (existing.builder_proof ?? 0) === 0;
+  const isV2FreeClaim = (existing.claim_count ?? 1) === 1 || minutesSinceGenerate < 30 || scoresAreZero;
 
   if (!isV2FreeClaim && daysSince < 30) {
     const daysRemaining = Math.ceil(30 - daysSince);

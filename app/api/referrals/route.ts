@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     .eq("referrer_handle", handle)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: "Failed to fetch referrals" }, { status: 500 });
+  if (error) return NextResponse.json({ count: 0, recent: [], xp_earned_total: 0 });
 
   const { data: xpRows } = await db
     .from("xp_earnings")

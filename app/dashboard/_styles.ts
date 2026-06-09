@@ -74,7 +74,7 @@ export function copyToClipboard(text: string) {
 }
 
 export function formatDate(data: DashboardData): string {
-  const raw = data.claimed_at || data.created_at || data.updated_at;
+  const raw = data.updated_at || data.claimed_at || data.created_at;
   if (!raw) return "Unknown";
   try {
     return new Date(raw).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
