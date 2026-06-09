@@ -13,6 +13,7 @@ export const authOptions: NextAuthOptions = {
     TwitterProvider({
       clientId: process.env.TWITTER_API_KEY!,
       clientSecret: process.env.TWITTER_API_SECRET!,
+      version: "1.0a",
     }),
   ],
   session: {
