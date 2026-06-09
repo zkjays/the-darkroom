@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 
 // GET /api/endorsements?goal_id=X
 export async function GET(req: NextRequest) {
@@ -26,11 +28,23 @@ export async function GET(req: NextRequest) {
 
 // POST /api/endorsements
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const sessionHandle = (session as { handle?: string }).handle;
+  if (!sessionHandle) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { goal_id, endorser_handle, type, reason } = await req.json();
 
   if (!goal_id || !endorser_handle || !type) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
+
+  // Security: endorser_handle must match authenticated session
+  if (sessionHandle !== endorser_handle) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   if (type !== "endorse" && type !== "challenge") {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   }
@@ -73,6 +87,65 @@ export async function POST(req: NextRequest) {
 
   const endorseCount = (allEndorsements ?? []).filter((e) => e.type === "endorse").length;
   const challengeCount = (allEndorsements ?? []).filter((e) => e.type === "challenge").length;
+
+  // Sync endorsement_count on the goal + recalculate work_proof score at milestones
+  if (type === "endorse") {
+    await db
+      .from("daily_goals")
+      .update({ endorsement_count: endorseCount })
+      .eq("id", goal_id);
+
+    if (endorseCount === 1 || endorseCount === 3) {
+      const PROOF_POINTS: Record<string, number> = {
+        Project: 8, OSS: 8, Article: 5, Video: 5, Design: 5, Thread: 3, Other: 3,
+      };
+
+      const { data: allProofs } = await db
+        .from("daily_goals")
+        .select("proof_type, endorsement_count")
+        .eq("handle", goal.handle)
+        .eq("status", "completed")
+        .not("proof_value", "is", null);
+
+      const totalPoints = (allProofs ?? []).reduce((sum, p) => {
+        const base = PROOF_POINTS[p.proof_type] ?? 3;
+        const count = p.endorsement_count ?? 0;
+        const multiplier = count >= 3 ? 1.5 : count >= 1 ? 1.0 : 0.5;
+        return sum + Math.round(base * multiplier);
+      }, 0);
+
+      const newWorkProof = Math.min(100, Math.round((totalPoints / 50) * 100));
+
+      const { data: idRow } = await db
+        .from("darkroom_ids")
+        .select("social_proof, builder_proof, bonus_points")
+        .eq("handle", goal.handle)
+        .single();
+
+      if (idRow) {
+        const newRoomScore = Math.round(
+          (idRow.social_proof ?? 0) * 0.35 +
+          (idRow.builder_proof ?? 0) * 0.35 +
+          newWorkProof * 0.30
+        );
+        const newTotalScore = Math.min(100, newRoomScore + (idRow.bonus_points ?? 0));
+
+        await db
+          .from("darkroom_ids")
+          .update({ work_proof: newWorkProof, score: newRoomScore, total_score: newTotalScore })
+          .eq("handle", goal.handle);
+
+        try {
+          await db.from("xp_earnings").insert({
+            handle: goal.handle,
+            source: "proof_validated",
+            amount: 10,
+            meta: { goal_id, endorsement_count: endorseCount },
+          });
+        } catch { /* non-critical */ }
+      }
+    }
+  }
 
   // 3+ challenges → deduct goal's XP from owner's bonus_points
   if (type === "challenge" && challengeCount >= 3) {

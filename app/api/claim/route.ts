@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 
 async function upsertStreak(db: ReturnType<typeof getServiceSupabase>, handle: string) {
   const today = new Date().toISOString().split("T")[0];
@@ -52,7 +54,6 @@ async function awardReferralXp(
   db: ReturnType<typeof getServiceSupabase>,
   referred_handle: string
 ) {
-  // Check if this handle was referred
   const { data: referral } = await db
     .from("referrals")
     .select("referrer_handle, rewarded")
@@ -64,7 +65,6 @@ async function awardReferralXp(
   const referrer = referral.referrer_handle;
   const todayStr = new Date().toISOString().split("T")[0];
 
-  // Daily cap: max 25 XP from referrals per day
   const { data: todayEarnings } = await db
     .from("xp_earnings")
     .select("amount")
@@ -77,7 +77,6 @@ async function awardReferralXp(
 
   const xpAmount = Math.min(5, 25 - earnedToday);
 
-  // Award XP to referrer
   const { data: referrerRow } = await db
     .from("darkroom_ids")
     .select("bonus_points")
@@ -89,7 +88,6 @@ async function awardReferralXp(
     .update({ bonus_points: (referrerRow?.bonus_points ?? 0) + xpAmount })
     .eq("handle", referrer);
 
-  // Log XP earning
   await db.from("xp_earnings").insert({
     handle: referrer,
     source: "referral",
@@ -97,7 +95,6 @@ async function awardReferralXp(
     meta: { referred_handle },
   });
 
-  // Mark referral as rewarded
   await db
     .from("referrals")
     .update({ rewarded: true })
@@ -105,20 +102,27 @@ async function awardReferralXp(
 }
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json();
+  // Security: never trust client-provided scores — use DB values set by /api/generate
   const {
     handle,
-    score,
     archetype,
     tagline,
-    stats,
     analysis,
     darkroom_line,
     profile_image_url,
   } = body;
 
-  if (!handle || !score || !archetype) {
+  if (!handle || !archetype) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  const sessionHandle = session.handle;
+  if (sessionHandle !== handle) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const db = getServiceSupabase();
@@ -133,15 +137,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
+  // Use scores from DB (set by /api/generate upsert) — never from request body
+  const dbScore = existing?.score ?? 0;
+  const dbSocialProof = existing?.social_proof ?? 0;
+  const dbBuilderProof = existing?.builder_proof ?? 0;
+  const dbWorkProof = existing?.work_proof ?? 0;
+
   // New claim
   if (!existing) {
     const authToken = crypto.randomUUID();
     const { error: insertError } = await db.from("darkroom_ids").insert({
       handle,
-      score,
+      score: dbScore,
       archetype,
       tagline,
-      stats,
+      social_proof: dbSocialProof,
+      builder_proof: dbBuilderProof,
+      work_proof: dbWorkProof,
       analysis,
       darkroom_line,
       profile_image_url: profile_image_url ?? null,
@@ -155,14 +167,16 @@ export async function POST(req: NextRequest) {
 
     await upsertStreak(db, handle);
     await awardReferralXp(db, handle);
-    return NextResponse.json({ success: true, claimed: true, token: authToken });
+    return NextResponse.json({ success: true, claimed: true });
   }
 
   // Existing — check cooldown
   const updatedAt = new Date(existing.updated_at);
   const daysSince = (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24);
+  // V2 launch: first-time claimers (V1 users) get one free reclaim — bypass cooldown
+  const isV2FreeClaim = (existing.claim_count ?? 1) === 1;
 
-  if (daysSince < 30) {
+  if (!isV2FreeClaim && daysSince < 30) {
     const daysRemaining = Math.ceil(30 - daysSince);
     return NextResponse.json({
       success: false,
@@ -177,16 +191,19 @@ export async function POST(req: NextRequest) {
   const { error: updateError } = await db
     .from("darkroom_ids")
     .update({
-      score,
+      score: dbScore,
       archetype,
       tagline,
-      stats,
+      social_proof: dbSocialProof,
+      builder_proof: dbBuilderProof,
+      work_proof: dbWorkProof,
       analysis,
       darkroom_line,
       profile_image_url: profile_image_url ?? null,
       claim_count: newCount,
       updated_at: new Date().toISOString(),
       auth_token: authToken,
+      is_og: isV2FreeClaim ? true : (existing?.is_og ?? false),
     })
     .eq("handle", handle);
 
@@ -195,5 +212,5 @@ export async function POST(req: NextRequest) {
   }
 
   await upsertStreak(db, handle);
-  return NextResponse.json({ success: true, reclaimed: true, claim_count: newCount, token: authToken });
+  return NextResponse.json({ success: true, reclaimed: true, claim_count: newCount });
 }

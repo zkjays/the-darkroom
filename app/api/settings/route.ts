@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
-import { getAuthToken, verifyAuth } from "@/app/lib/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 
 export async function GET(req: NextRequest) {
   const handle = req.nextUrl.searchParams.get("handle");
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
   const db = getServiceSupabase();
   const { data, error } = await db
     .from("darkroom_ids")
-    .select("profile_public, goals_public, theme_accent")
+    .select("profile_public, goals_public, theme_accent, open_to_opportunities")
     .eq("handle", handle)
     .single();
 
@@ -18,24 +19,27 @@ export async function GET(req: NextRequest) {
     profile_public: data.profile_public ?? false,
     goals_public: data.goals_public ?? false,
     theme_accent: data.theme_accent ?? "cyan",
+    open_to_opportunities: data.open_to_opportunities ?? false,
   });
 }
 
 export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json();
-  const { handle, profile_public, goals_public, theme_accent } = body;
+  const { handle, profile_public, goals_public, theme_accent, open_to_opportunities } = body;
 
   if (!handle) return NextResponse.json({ error: "Missing handle" }, { status: 400 });
 
-  const token = getAuthToken(req);
-  if (!(await verifyAuth(handle, token))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const sessionHandle = session.handle;
+  if (sessionHandle !== handle) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const updates: Record<string, unknown> = {};
   if (typeof profile_public === "boolean") updates.profile_public = profile_public;
   if (typeof goals_public === "boolean") updates.goals_public = goals_public;
   if (typeof theme_accent === "string") updates.theme_accent = theme_accent;
+  if (typeof open_to_opportunities === "boolean") updates.open_to_opportunities = open_to_opportunities;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
@@ -46,7 +50,7 @@ export async function PATCH(req: NextRequest) {
     .from("darkroom_ids")
     .update(updates)
     .eq("handle", handle)
-    .select("profile_public, goals_public, theme_accent")
+    .select("profile_public, goals_public, theme_accent, open_to_opportunities")
     .single();
 
   if (error) return NextResponse.json({ error: "Failed to update settings" }, { status: 500 });
@@ -55,5 +59,6 @@ export async function PATCH(req: NextRequest) {
     profile_public: data.profile_public,
     goals_public: data.goals_public,
     theme_accent: data.theme_accent ?? "cyan",
+    open_to_opportunities: data.open_to_opportunities ?? false,
   });
 }

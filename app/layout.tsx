@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Outfit, Space_Mono } from "next/font/google";
 import "./globals.css";
+import { Providers } from "./providers";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -50,7 +51,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.variable} ${spaceMono.variable}`}>
       <body className="bg-[#050508] text-white antialiased font-(family-name:--font-outfit)">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

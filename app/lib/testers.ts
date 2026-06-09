@@ -18,11 +18,7 @@ export const APPROVED_TESTERS = [
   "rufus1eth",
   "autheo_network",
   "0xgodzubby",
-  "z0renx",
   "minacryptocom",
-
-
-
 ];
 
 export function isTester(handle: string): boolean {

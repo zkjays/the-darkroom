@@ -1,10 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { convertXPToPoints } from "@/app/lib/xp-system";
-import { getAuthToken, verifyAuth } from "@/app/lib/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
+import { sanitizeHandle } from "@/app/lib/sanitize";
+
+const PROOF_POINTS: Record<string, number> = {
+  Project: 8,
+  OSS: 8,
+  Article: 5,
+  Video: 5,
+  Design: 5,
+  Thread: 3,
+  Other: 3,
+};
 
 function today() {
   return new Date().toISOString().split("T")[0];
+}
+
+function sessionHandle(session: object | null): string | undefined {
+  return (session as import("next-auth").Session | null)?.handle;
 }
 
 // GET /api/goals?handle=X                    — fetch today's goals for handle
@@ -13,7 +29,7 @@ function today() {
 // GET /api/goals?handle=X&public_only=true   — only public goals today
 // GET /api/goals?templates=true&limit=10     — trending public goal templates
 export async function GET(req: NextRequest) {
-  const handle = req.nextUrl.searchParams.get("handle");
+  const handle = sanitizeHandle(req.nextUrl.searchParams.get("handle") ?? "") || null;
   const templatesMode = req.nextUrl.searchParams.get("templates") === "true";
   const publicOnly = req.nextUrl.searchParams.get("public_only") === "true";
   const allMode = req.nextUrl.searchParams.get("all") === "true";
@@ -53,21 +69,54 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
 
   if (error) return NextResponse.json({ error: "Failed to fetch goals" }, { status: 500 });
-  return NextResponse.json({ goals: data ?? [] });
+
+  const goals = data ?? [];
+
+  // Enrich each goal with a live endorsement count from goal_endorsements
+  if (goals.length > 0) {
+    const goalIds = goals.map((g) => g.id);
+    const { data: endorsements } = await db
+      .from("goal_endorsements")
+      .select("goal_id")
+      .in("goal_id", goalIds);
+
+    const endorsementCounts: Record<string, number> = {};
+    endorsements?.forEach((e) => {
+      endorsementCounts[e.goal_id] = (endorsementCounts[e.goal_id] ?? 0) + 1;
+    });
+
+    const goalsWithCounts = goals.map((g) => ({
+      ...g,
+      endorsement_count: endorsementCounts[g.id] ?? g.endorsement_count ?? 0,
+    }));
+
+    return NextResponse.json({ goals: goalsWithCounts });
+  }
+
+  return NextResponse.json({ goals });
 }
 
 // POST /api/goals — create a new goal
 // If proof_value is provided the goal is created as immediately completed (Work tab submission).
 // Direct completions bypass the 3-goal daily limit.
 export async function POST(req: NextRequest) {
-  const { handle, goal_text, proof_type, proof_value, target_stat, is_public, template_id } = await req.json();
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+
+  const {
+    handle: rawHandle, goal_text, proof_type, proof_value,
+    target_stat, is_public, template_id,
+    image_url, description, completed_at, xp_reward,
+  } = body;
+  const handle = sanitizeHandle(rawHandle ?? "");
 
   if (!handle || !goal_text || !proof_type || !target_stat) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  const token = getAuthToken(req);
-  if (!(await verifyAuth(handle, token))) {
+  if (sessionHandle(session) !== handle) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -101,25 +150,37 @@ export async function POST(req: NextRequest) {
 
   const now = new Date().toISOString();
 
+  const insertPayload = {
+    handle,
+    goal_text,
+    proof_type,
+    proof_value: proof_value ?? null,
+    target_stat: target_stat ?? "work_proof",
+    status: isDirectComplete ? "completed" : "active",
+    completed_at: isDirectComplete ? (completed_at ?? now) : null,
+    xp_reward: xp_reward ?? 5,
+    goal_date: today(),
+    is_public: is_public ?? true,
+    template_id: template_id ?? null,
+    image_url: image_url ?? null,
+    description: description ?? null,
+    original_proof_value: proof_value ?? null,
+    original_goal_text: goal_text ?? null,
+    original_description: description ?? null,
+    original_image_url: image_url ?? null,
+    copy_count: 0,
+  };
+
   const { data: goal, error: insertError } = await db
     .from("daily_goals")
-    .insert({
-      handle,
-      goal_text,
-      proof_type,
-      proof_value: proof_value ?? null,
-      target_stat,
-      status: isDirectComplete ? "completed" : "pending",
-      completed_at: isDirectComplete ? now : null,
-      xp_reward: 1,
-      goal_date: today(),
-      is_public: is_public ?? false,
-      template_id: template_id ?? null,
-    })
+    .insert(insertPayload)
     .select()
     .single();
 
-  if (insertError) return NextResponse.json({ error: "Failed to create goal" }, { status: 500 });
+  if (insertError) {
+    console.error("Goal insert error:", JSON.stringify(insertError));
+    return NextResponse.json({ error: "Failed to create goal" }, { status: 500 });
+  }
 
   // If direct-complete (Work submission), run XP logic immediately
   if (isDirectComplete && goal) {
@@ -176,16 +237,12 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/goals — complete a goal with proof
 export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { handle: authHandle, goal_id, proof_value } = await req.json();
   if (!goal_id || !proof_value) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-  }
-
-  if (authHandle) {
-    const token = getAuthToken(req);
-    if (!(await verifyAuth(authHandle, token))) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
   }
 
   const db = getServiceSupabase();
@@ -199,6 +256,11 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (getError || !goal) return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+
+  // Verify the session user owns this goal
+  if (sessionHandle(session) !== goal.handle) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   // Mark completed
   const { data: updated, error: updateError } = await db
@@ -266,5 +328,179 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  void authHandle; // unused after session-based auth
   return NextResponse.json({ goal: updated, xp: xpResult });
+}
+
+// PUT /api/goals — endorse a proof OR edit a proof
+// SQL: ALTER TABLE daily_goals ADD COLUMN IF NOT EXISTS edited boolean DEFAULT false;
+export async function PUT(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+
+  // ── ENDORSEMENT BRANCH ──────────────────────────────────────────────────
+  if ("goal_id" in body) {
+    const { goal_id } = body;
+    const endorser_handle = sessionHandle(session);
+
+    if (!goal_id || !endorser_handle) {
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+
+    const db = getServiceSupabase();
+
+    const { data: goal, error: getError } = await db
+      .from("daily_goals")
+      .select("*")
+      .eq("id", goal_id)
+      .single();
+
+    if (getError || !goal) return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+
+    if (goal.handle === endorser_handle) {
+      console.warn(`security: self-endorsement attempt by handle=${endorser_handle} on goal=${goal_id}`);
+      return NextResponse.json({ error: "Cannot endorse your own proof" }, { status: 403 });
+    }
+
+    // Dedup — un seul endorsement par handle
+    const { data: existing } = await db
+      .from("goal_endorsements")
+      .select("id")
+      .eq("goal_id", goal_id)
+      .eq("endorser_handle", endorser_handle)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json({ error: "Already endorsed" }, { status: 409 });
+    }
+
+    // Insert dans goal_endorsements (source of truth)
+    const { error: insertError } = await db
+      .from("goal_endorsements")
+      .insert({ goal_id, endorser_handle, type: "endorse" });
+
+    if (insertError) return NextResponse.json({ error: "Failed to record endorsement" }, { status: 500 });
+
+    // Count réel depuis goal_endorsements
+    const { data: endorsementRows } = await db
+      .from("goal_endorsements")
+      .select("id")
+      .eq("goal_id", goal_id);
+
+    const newCount = endorsementRows?.length ?? 1;
+
+    const { error: updateError } = await db
+      .from("daily_goals")
+      .update({ endorsement_count: newCount })
+      .eq("id", goal_id);
+
+    if (updateError) return NextResponse.json({ error: "Failed to endorse" }, { status: 500 });
+
+    if (newCount === 1 || newCount === 3) {
+      const handle = goal.handle;
+
+      const { data: allProofs } = await db
+        .from("daily_goals")
+        .select("proof_type, endorsement_count")
+        .eq("handle", handle)
+        .eq("status", "completed")
+        .not("proof_value", "is", null);
+
+      const totalPoints = (allProofs ?? []).reduce((sum, p) => {
+        const base = PROOF_POINTS[p.proof_type] ?? 3;
+        const count = p.endorsement_count ?? 0;
+        const multiplier = count >= 3 ? 1.5 : count >= 1 ? 1.0 : 0.5;
+        return sum + Math.round(base * multiplier);
+      }, 0);
+
+      const newWorkProof = Math.min(100, Math.round((totalPoints / 50) * 100));
+
+      const { data: idRow } = await db
+        .from("darkroom_ids")
+        .select("social_proof, builder_proof, bonus_points")
+        .eq("handle", handle)
+        .single();
+
+      if (idRow) {
+        const newRoomScore = Math.round(
+          (idRow.social_proof ?? 0) * 0.35 +
+          (idRow.builder_proof ?? 0) * 0.35 +
+          newWorkProof * 0.30
+        );
+        const newTotalScore = Math.min(100, newRoomScore + (idRow.bonus_points ?? 0));
+
+        await db
+          .from("darkroom_ids")
+          .update({ work_proof: newWorkProof, score: newRoomScore, total_score: newTotalScore })
+          .eq("handle", handle);
+
+        try {
+          await db.from("xp_earnings").insert({
+            handle,
+            source: "proof_validated",
+            amount: 10,
+            meta: { goal_id, endorsement_count: newCount },
+          });
+        } catch { /* non-critical */ }
+      }
+    }
+
+    return NextResponse.json({ endorsement_count: newCount });
+  }
+
+  // ── EDIT BRANCH ─────────────────────────────────────────────────────────
+  const { id, goal_text, description, image_url, proof_type, completed_at, proof_value } = body;
+
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  const db = getServiceSupabase();
+
+  const { data: goal, error: getError } = await db
+    .from("daily_goals")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (getError || !goal) return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+
+  if (sessionHandle(session) !== goal.handle) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Lock: validated (≥3 endorsements) AND created more than 7 days ago
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  if ((goal.endorsement_count ?? 0) >= 3 && new Date(goal.created_at) < sevenDaysAgo) {
+    return NextResponse.json({ error: "Proof is locked" }, { status: 403 });
+  }
+
+  const updates: Record<string, unknown> = {};
+  if ((goal.endorsement_count ?? 0) >= 1) updates.edited = true;
+  if (goal_text !== undefined) updates.goal_text = goal_text;
+  if (description !== undefined) updates.description = description;
+  if (image_url !== undefined) updates.image_url = image_url;
+  if (proof_type !== undefined) updates.proof_type = proof_type;
+  if (completed_at !== undefined) updates.completed_at = completed_at;
+
+  // URL may only change when nobody has endorsed yet; never touch original_proof_value
+  if (proof_value !== undefined && proof_value !== goal.proof_value && (goal.endorsement_count ?? 0) === 0) {
+    updates.proof_value = proof_value;
+    updates.endorsement_count = 0;
+    await db.from("goal_endorsements").delete().eq("goal_id", id);
+  }
+
+  const { data: updated, error: updateError } = await db
+    .from("daily_goals")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (updateError) {
+    console.error("Goal update error:", JSON.stringify(updateError));
+    return NextResponse.json({ error: "Failed to update goal" }, { status: 500 });
+  }
+
+  return NextResponse.json({ goal: updated });
 }
