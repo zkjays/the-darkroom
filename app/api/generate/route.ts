@@ -265,7 +265,16 @@ export async function POST(req: NextRequest) {
   if (!anthropicKey) {
     console.log("Fallback: using deterministic scoring (no API key)");
     warnings.push("claude_api_failed: No API key configured, using fallback scoring");
-    return NextResponse.json({ ...getFallbackResult(handle, goals, warnings), profile_image_url: profileImageUrl || undefined });
+    const fallback = getFallbackResult(handle, goals, warnings);
+    try {
+      const supabase = getServiceSupabase();
+      const { error: upsertErr } = await supabase.from("darkroom_ids").upsert(
+        { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, total_score: fallback.score, generate_at: new Date().toISOString() },
+        { onConflict: "handle" }
+      );
+      if (upsertErr) console.error("Supabase upsert (no-key fallback) failed:", JSON.stringify(upsertErr));
+    } catch (dbErr) { console.error("Supabase upsert (no-key fallback) exception:", dbErr); }
+    return NextResponse.json({ ...fallback, profile_image_url: profileImageUrl || undefined });
   }
 
   console.log("Step 3: Calling Claude API");
@@ -387,7 +396,7 @@ Respond ONLY with JSON (no markdown, no backticks):
         { onConflict: "handle" }
       );
     } catch (dbErr) {
-      console.log("Supabase upsert failed (non-fatal):", dbErr);
+      console.error("Supabase upsert (claude success) failed:", JSON.stringify(dbErr));
     }
 
     return NextResponse.json({
