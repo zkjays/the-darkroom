@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
 
   if (insertError) {
     console.error("Goal insert error:", JSON.stringify(insertError));
-    return NextResponse.json({ error: insertError.message ?? "Failed to create goal", code: insertError.code }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create goal" }, { status: 500 });
   }
 
   // If direct-complete (Work submission), run XP logic + update work_proof immediately
