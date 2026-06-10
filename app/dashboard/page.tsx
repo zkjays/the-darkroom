@@ -16,6 +16,7 @@ import { SITE_URL } from "./_types";
 import { SettingsPanel } from "./SettingsPanel";
 import { WorkTab } from "./WorkTab";
 import { ProofRing, getSocialAdvice, getBuilderAdvice } from "./StatsPanel";
+import OnboardingWidget from "../component/OnboardingWidget";
 
 // ── Local helpers (small, used only in this file) ──────────────────────────
 function PfpPlaceholder({ handle, size }: { handle: string; size: number }) {
@@ -49,42 +50,42 @@ const TOUR_STEPS = [
   {
     title: "Welcome to The Darkroom",
     icon: "◈",
-    iconColor: "#00CCFF",
+    iconColor: "#c9a84c",
     content: "This is your Builder OS. Everything here is based on real signals — not vanity metrics. Let's walk through what you're looking at.",
     hint: null,
   },
   {
     title: "Social Proof",
     icon: "◉",
-    iconColor: "#a78bfa",
+    iconColor: "#c9a84c",
     content: "Analyzes your X presence — posting consistency, engagement quality, and how clearly you're positioning yourself. Refreshed by Claude via your X activity.",
     hint: "Tap the ring anytime to get personalized advice on improving this score.",
   },
   {
     title: "Builder Proof",
     icon: "◉",
-    iconColor: "#60a5fa",
+    iconColor: "#c9a84c",
     content: "Measures your technical builder signal — code shared, projects mentioned, build-in-public activity. The deeper your content, the higher this goes.",
     hint: "Tap the ring for tier-specific advice on what to post.",
   },
   {
     title: "Work Proof",
     icon: "◉",
-    iconColor: "#34d399",
+    iconColor: "#c9a84c",
     content: "Unlike the other two, this score starts at 0 and is 100% in your hands. Submit links to real work you've done — projects, PRs, articles, prototypes.",
     hint: "Head to the Work tab to submit your first proof.",
   },
   {
     title: "Daily Refresh",
     icon: "↻",
-    iconColor: "#00CCFF",
+    iconColor: "#c9a84c",
     content: "Once a day, you can refresh your Social and Builder scores. Claude re-analyzes your latest X activity. Make it a daily ritual — post something, then refresh.",
     hint: "The refresh button is in the Proof section header.",
   },
   {
     title: "Work Tab",
     icon: "⬡",
-    iconColor: "#34d399",
+    iconColor: "#c9a84c",
     content: "Submit concrete proofs of work here — a GitHub link, a deployed project, a published article. Each validated proof grows your Work Proof score.",
     hint: "3 community endorsements = a validated proof.",
   },
@@ -146,6 +147,15 @@ export default function Dashboard() {
     localStorage.setItem("darkroom_shared", "true");
   }, []);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent<string>).detail;
+      if (tab === "id" || tab === "work" || tab === "settings") setActiveTab(tab as TabId);
+    };
+    window.addEventListener("darkroom:switchTab", handler);
+    return () => window.removeEventListener("darkroom:switchTab", handler);
+  }, []);
+
   // ── Loading / error states ──
   if (authStatus === "loading" || loading) {
     return (
@@ -188,20 +198,25 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#050508] text-white font-[family-name:var(--font-outfit)]">
       <Toast messages={toastMessages} />
       <Navbar />
+      <OnboardingWidget
+        handle={data.handle}
+        accent={accent}
+        profilePublic={profilePublic}
+        onSwitchTab={(tab) => setActiveTab(tab as TabId)}
+      />
 
       {/* ── LEFT SIDEBAR ── */}
-      <div className="fixed left-0 top-12 bottom-0 z-40 w-16 lg:w-48 flex flex-col bg-[#0c0c14] border-r border-white/5">
+      <div className="fixed left-0 top-12 bottom-0 z-40 w-16 lg:w-48 flex flex-col border-r border-white/[0.06]">
         <div className="flex flex-col gap-1 px-2 py-6 flex-1">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.id;
-            const accentHex = ACCENT_HEX[accent] ?? "#67e8f9";
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                style={isActive ? { color: accentHex, backgroundColor: accentHex + "18" } : {}}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all w-full text-left ${
-                  isActive ? "" : "text-slate-500 hover:text-slate-200 hover:bg-white/[0.04]"
+                style={isActive ? { borderColor: "rgba(201,168,76,0.45)", color: "#c9a84c" } : { borderColor: "transparent" }}
+                className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 transition-all w-full text-left ${
+                  isActive ? "" : "text-slate-600 hover:text-slate-300 hover:border-white/[0.06]"
                 }`}
               >
                 <span className="flex-shrink-0 w-5 h-5">
@@ -283,21 +298,19 @@ export default function Dashboard() {
               <div className="flex justify-center gap-10">
                 <ProofRing
                   value={data.social_proof ?? 0}
-                  color="#a78bfa"
+                  color="rgba(255,255,255,0.75)"
                   label="Social"
                   sublabel="Proof"
                   hint="tap for insights"
-                  hoverGlow="group-hover:drop-shadow-[0_0_20px_rgba(167,139,250,0.4)]"
-                  onClick={() => setProofModal({ type: "social", value: data.social_proof ?? 0, color: "#a78bfa" })}
+                  onClick={() => setProofModal({ type: "social", value: data.social_proof ?? 0, color: "rgba(255,255,255,0.75)" })}
                 />
                 <ProofRing
                   value={data.builder_proof ?? 0}
-                  color="#60a5fa"
+                  color="rgba(255,255,255,0.75)"
                   label="Builder"
                   sublabel="Proof"
                   hint="tap for insights"
-                  hoverGlow="group-hover:drop-shadow-[0_0_20px_rgba(96,165,250,0.4)]"
-                  onClick={() => setProofModal({ type: "builder", value: data.builder_proof ?? 0, color: "#60a5fa" })}
+                  onClick={() => setProofModal({ type: "builder", value: data.builder_proof ?? 0, color: "rgba(255,255,255,0.75)" })}
                 />
               </div>
 
@@ -312,14 +325,14 @@ export default function Dashboard() {
                 return (
                   <div className="group flex flex-col items-center gap-2">
                     <div
-                      className="relative transition-all duration-300 group-hover:scale-105 group-hover:drop-shadow-[0_0_20px_rgba(52,211,153,0.4)]"
+                      className="relative transition-all duration-300 group-hover:scale-105"
                       style={{ width: size, height: size }}
                     >
                       <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
                         <circle cx={size / 2} cy={size / 2} r={radius}
-                          fill="none" stroke="#34d39920" strokeWidth={strokeWidth} />
+                          fill="none" stroke="rgba(201,168,76,0.15)" strokeWidth={strokeWidth} />
                         <circle cx={size / 2} cy={size / 2} r={radius}
-                          fill="none" stroke="#34d399" strokeWidth={strokeWidth}
+                          fill="none" stroke="#c9a84c" strokeWidth={strokeWidth}
                           strokeLinecap="round"
                           strokeDasharray={circumference}
                           strokeDashoffset={offset}
@@ -328,14 +341,14 @@ export default function Dashboard() {
                       <div className="absolute inset-0 flex items-center justify-center">
                         <span
                           className="text-2xl font-bold"
-                          style={{ color: "#34d399", opacity: wp === 0 ? 0.4 : 1 }}
+                          style={{ color: "#c9a84c", opacity: wp === 0 ? 0.4 : 1 }}
                         >
                           {wp}
                         </span>
                       </div>
                     </div>
                     <div className="text-center">
-                      <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] uppercase" style={{ color: "#34d399" }}>WORK</p>
+                      <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] uppercase" style={{ color: "#c9a84c" }}>WORK</p>
                       <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 tracking-[0.15em] uppercase">PROOF</p>
                     </div>
                     <button
@@ -387,40 +400,14 @@ export default function Dashboard() {
                 />
               </div>
 
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
-                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-4`}>Your Journey</p>
-                <div className="flex flex-col gap-0">
-                  {Array.from({ length: data.claim_count }, (_, i) => {
-                    const isLatest = i === data.claim_count - 1;
-                    const isFirst = i === 0;
-                    return (
-                      <div key={i} className="flex items-start gap-4 relative">
-                        <div className="flex flex-col items-center">
-                          <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${isLatest ? "bg-white/60" : "bg-white/20"}`} />
-                          {i < data.claim_count - 1 && <div className="w-px flex-1 bg-white/[0.06] min-h-[28px]" />}
-                        </div>
-                        <div className="pb-4">
-                          <p className="text-sm text-white font-medium">
-                            Claim #{i + 1}
-                            {isLatest && data.claim_count > 1 && <span className="ml-2 text-xs text-slate-400">(latest)</span>}
-                          </p>
-                          <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400 mt-0.5">
-                            {isFirst ? claimDate : formatDate(data)} · Score {data.score}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-white/[0.05]">
-                    {[{ label: "Lessons completed", value: "0" }, { label: "Certifications earned", value: "0" }].map(({ label, value }) => (
-                      <div key={label} className="flex justify-between items-center opacity-40">
-                        <span className="text-xs text-slate-300">{label}</span>
-                        <span className="font-[family-name:var(--font-mono)] text-xs text-slate-400">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              {data.updated_at && (Date.now() - new Date(data.updated_at).getTime()) > 7 * 24 * 60 * 60 * 1000 && (
+                <button
+                  onClick={() => { window.location.href = "/darkroom-id"; }}
+                  className="w-full rounded-sm border border-white/[0.07] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.04] py-3 font-[family-name:var(--font-mono)] text-xs text-slate-400 hover:text-white transition-all tracking-widest uppercase"
+                >
+                  ↻ Re-analyze my ID
+                </button>
+              )}
             </div>
 
             {/* Coming soon */}
@@ -497,15 +484,15 @@ export default function Dashboard() {
       {/* ── TOUR BUTTON ── */}
       <button
         onClick={() => setTourStep(0)}
-        className="fixed bottom-6 right-6 z-40 text-xs font-[family-name:var(--font-mono)] px-3 py-2 rounded-lg bg-[#0c0c14] border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-all"
+        className="fixed bottom-6 right-[4.5rem] z-40 text-xs font-[family-name:var(--font-mono)] px-3 py-2 rounded-sm bg-[#0c0c14] border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-all tracking-widest"
       >
-        ? Tour
+        ◈ Discover
       </button>
 
       {/* ── TOUR MODAL ── */}
       {tourStep !== null && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center px-4">
-          <div className="max-w-sm w-full bg-[#0c0c14] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
+          <div className="max-w-sm w-full bg-[#0c0c14] border border-white/[0.10] rounded-sm p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <span className="font-[family-name:var(--font-mono)] text-[10px] text-slate-600 tracking-widest">
                 STEP {tourStep + 1} / {TOUR_STEPS.length}
@@ -531,9 +518,9 @@ export default function Dashboard() {
               {TOUR_STEPS[tourStep].content}
             </p>
             {TOUR_STEPS[tourStep].hint && (
-              <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3">
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-sm px-4 py-3">
                 <p className="font-[family-name:var(--font-mono)] text-slate-500 text-xs leading-relaxed">
-                  💡 {TOUR_STEPS[tourStep].hint}
+                  ◈ {TOUR_STEPS[tourStep].hint}
                 </p>
               </div>
             )}
@@ -546,7 +533,7 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={() => tourStep < TOUR_STEPS.length - 1 ? setTourStep(tourStep + 1) : setTourStep(null)}
-                className="font-[family-name:var(--font-mono)] text-xs px-4 py-2 rounded-lg border transition-all"
+                className="font-[family-name:var(--font-mono)] text-xs px-4 py-2 rounded-sm border transition-all tracking-widest"
                 style={{
                   borderColor: TOUR_STEPS[tourStep].iconColor + "40",
                   color: TOUR_STEPS[tourStep].iconColor,

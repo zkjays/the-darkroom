@@ -23,7 +23,7 @@ function getTimeLeft(): TimeLeft | null {
 
 export default function CountdownPage() {
   const router = useRouter()
-  const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(getTimeLeft)
+  const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null)
 
   const tick = useCallback(() => {
     const t = getTimeLeft()
@@ -32,6 +32,7 @@ export default function CountdownPage() {
   }, [router])
 
   useEffect(() => {
+    setTimeLeft(getTimeLeft())
     const timer = setInterval(tick, 1000)
     return () => clearInterval(timer)
   }, [tick])

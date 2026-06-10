@@ -42,7 +42,7 @@ function PfpPlaceholder({ handle, size }: { handle: string; size: number }) {
   return (
     <div
       className="rounded-full bg-white/[0.06] flex items-center justify-center flex-shrink-0"
-      style={{ width: size, height: size, boxShadow: "0 0 0 2px rgba(103,232,249,0.35)" }}
+      style={{ width: size, height: size, boxShadow: "0 0 0 2px rgba(255,255,255,0.12)" }}
     >
       <span className="text-slate-300 font-bold" style={{ fontSize: size * 0.38 }}>
         {handle.charAt(0).toUpperCase()}
@@ -59,7 +59,7 @@ function ProfileImage({ url, handle, size }: { url?: string; handle: string; siz
       src={url} alt={handle} width={size} height={size}
       onError={() => setFailed(true)}
       className="rounded-full object-cover flex-shrink-0"
-      style={{ width: size, height: size, boxShadow: "0 0 0 2px rgba(103,232,249,0.35)" }}
+      style={{ width: size, height: size, boxShadow: "0 0 0 2px rgba(255,255,255,0.12)" }}
     />
   );
 }
@@ -201,8 +201,8 @@ export default function PublicProfile() {
                 <span className="text-sm text-slate-400 mt-1">🔥 {data.streak.current_streak} day streak</span>
               )}
               {data.open_to_opportunities && (
-                <span className="mt-1 self-start font-[family-name:var(--font-mono)] text-xs px-2.5 py-1 rounded-full border border-emerald-500/40 text-emerald-400 bg-emerald-500/10">
-                  ◈ Open to opportunities
+                <span className="mt-1 self-start font-[family-name:var(--font-mono)] text-xs px-2.5 py-1 rounded-sm border border-[#c9a84c]/40 bg-[#c9a84c]/[0.08]" style={{ color: "#c9a84c" }}>
+                  ◈ available for work
                 </span>
               )}
               {data.is_og && (
@@ -214,8 +214,8 @@ export default function PublicProfile() {
           </div>
 
           <div className="bg-[#0c0c14] border border-white/10 rounded-xl px-6 py-4 flex-shrink-0">
-            <p className="text-xs font-mono text-cyan-400/55 tracking-widest">ROOM SCORE</p>
-            <p className="text-4xl font-bold text-cyan-400">{totalScore}</p>
+            <p className="text-xs font-mono tracking-widest" style={{ color: "rgba(201,168,76,0.6)" }}>ROOM SCORE</p>
+            <p className="text-4xl font-bold" style={{ color: "#c9a84c" }}>{totalScore}</p>
           </div>
         </div>
 
@@ -281,7 +281,7 @@ export default function PublicProfile() {
 
         {/* ── Row 4: Footer ── */}
         <div className="flex justify-between items-center mt-8">
-          <span className="text-xs font-mono text-slate-500">◈ 0 trusts</span>
+          <span className="text-xs font-mono text-slate-500">◈ proof of work — not promises</span>
           <a
             href="/darkroom-id"
             className="text-xs font-mono text-cyan-400/60 hover:text-cyan-400 transition-colors"

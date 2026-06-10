@@ -90,36 +90,16 @@ function DarkroomIDContent() {
       return;
     }
     const handle = session?.handle;
-    if (handle) {
-      setAnswers((prev) => ({ ...prev, handle }));
-      setStep(1);
-      setVisible(true);
-    }
-  }, [authStatus, session, router]);
-
-  useEffect(() => {
-    const handle = session?.handle;
     if (!handle) return;
-    fetch(`/api/check-claim?handle=${encodeURIComponent(handle)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.already_claimed && data.days_until_reclaim > 0) {
-          // Cooldown active — block reclaim
-          setAlreadyClaimedDays(data.days_until_reclaim);
-          setShowAlreadyClaimed(true);
-        } else if (data.already_claimed && data.days_until_reclaim === 0) {
-          // Free reclaim (V1 user or post-cooldown) — skip goals, auto-run analysis
-          setIsReclaim(true);
-          const autoAnswers = { handle, goals: [] };
-          setAnswers(autoAnswers);
-          setStep(2);
-          setVisible(true);
-          submitQuiz(autoAnswers);
-        }
-      })
-      .catch(() => {});
+    // Always auto-analyze immediately — no quiz, no cooldown check
+    const autoAnswers = { handle, goals: [] };
+    setAnswers(autoAnswers);
+    setIsReclaim(true);
+    setStep(2);
+    setVisible(true);
+    submitQuiz(autoAnswers);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [authStatus, session, router]);
 
   const goTo = (next: number) => {
     setVisible(false);
@@ -293,6 +273,14 @@ function DarkroomIDContent() {
   }
 
   const progressWidth = step === 0 ? "0%" : step === 1 ? "50%" : "100%";
+
+  if (step === 0) {
+    return (
+      <div className="min-h-screen bg-[#050508] flex items-center justify-center">
+        <div className="w-7 h-7 rounded-full border-2 border-white/15 border-t-white/60 animate-spin" />
+      </div>
+    );
+  }
   const isResults = step === 2 && !!result;
 
   return (

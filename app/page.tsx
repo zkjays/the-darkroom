@@ -1,6 +1,6 @@
 import Navbar from "@/app/component/landing/Navbar";
 import Hero from "@/app/component/landing/Hero";
-import PhaseTeaser from "@/app/component/landing/PhaseTeaser";
+import HeroProductPreview from "@/app/component/landing/HeroProductPreview";
 import Footer from "@/app/component/landing/Footer";
 import Particles from "@/app/component/landing/Particles";
 import MouseGlow from "@/app/component/landing/MouseGlow";
@@ -12,32 +12,8 @@ export default function Home() {
       <CountdownBanner />
       <div className="relative overflow-hidden bg-[#050508]">
 
-        {/* === DEPTH LAYER: Ambient orb glows === */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="darkroom-glow-main" />
-          <div className="darkroom-glow-top" />
-          <div className="darkroom-glow-bottom" />
-          <div className="darkroom-glow-accent" />
-          <div className="darkroom-glow-tr" />
-        </div>
-
-        {/* === DEPTH LAYER: Floating screen glows === */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="screen-glow screen-1" />
-          <div className="screen-glow screen-2" />
-          <div className="screen-glow screen-3" />
-          <div className="screen-glow screen-4" />
-        </div>
-
-        {/* === DEPTH LAYER: Light rays === */}
-        <div className="light-rays">
-          <div className="light-ray light-ray-1" />
-          <div className="light-ray light-ray-2" />
-          <div className="light-ray light-ray-3" />
-        </div>
-
         {/* === DEPTH LAYER: Grid === */}
-        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-size-[50px_50px]" />
+        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.022)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.022)_1px,transparent_1px)] bg-size-[50px_50px]" />
 
         {/* === DEPTH LAYER: Scanlines === */}
         <div className="scanlines" />
@@ -55,7 +31,7 @@ export default function Home() {
         <div className="relative z-10">
           <Navbar />
           <Hero />
-          <PhaseTeaser />
+          <HeroProductPreview />
           <Footer />
         </div>
       </div>

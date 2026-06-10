@@ -1,15 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCardStyle, getButtonStyle, copyToClipboard, ACCENT_HEX } from "./_styles";
+import { copyToClipboard } from "./_styles";
 import { SITE_URL } from "./_types";
-
-const ACCENT_SWATCHES = [
-  { key: "cyan",    hex: "#67e8f9" },
-  { key: "violet",  hex: "#c4b5fd" },
-  { key: "emerald", hex: "#6ee7b7" },
-  { key: "amber",   hex: "#fcd34d" },
-] as const;
 
 interface SettingsState {
   profile_public: boolean;
@@ -72,116 +65,78 @@ export function SettingsPanel({
   };
 
   return (
-    <div className={`${getCardStyle(themeAccent).primaryCard} rounded-xl p-5 flex flex-col gap-5`}>
-      {/* Profile visibility */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-0.5">
-          <p className="text-sm text-slate-200 font-medium">Profile Visibility</p>
-          <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-400 leading-relaxed">
-            Public profiles can be discovered by other builders
-          </p>
-        </div>
+    <div className="bg-[#0c0c14] border border-white/[0.07] rounded-sm flex flex-col divide-y divide-white/[0.06]">
+
+      {/* Profile public */}
+      <div className="flex items-center justify-between px-5 py-4">
+        <p className="font-[family-name:var(--font-mono)] text-xs uppercase tracking-widest text-slate-400">Profile public</p>
         <button
           onClick={() => setProfilePublic((v) => !v)}
-          className={`flex-shrink-0 w-11 h-6 rounded-full border transition-all duration-200 relative ${
-            profilePublic ? "bg-white/20 border-white/30" : "bg-white/[0.04] border-white/10"
+          className={`flex-shrink-0 w-10 h-5 rounded-sm border transition-all duration-200 relative ${
+            profilePublic ? "border-[#c9a84c]/50 bg-[#c9a84c]/10" : "border-white/10 bg-white/[0.02]"
           }`}
         >
-          <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ${profilePublic ? "left-[22px]" : "left-0.5"}`} />
+          <span className={`absolute top-0.5 w-4 h-4 rounded-none transition-all duration-200 ${profilePublic ? "left-[22px] bg-[#c9a84c]" : "left-0.5 bg-white/30"}`} />
         </button>
       </div>
 
-      {/* Goals visibility */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-0.5">
-          <p className="text-sm text-slate-200 font-medium">Goals Visibility Default</p>
-          <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-400 leading-relaxed">
-            Public goals can be endorsed and copied by the community
-          </p>
-        </div>
+      {/* Work proof public */}
+      <div className="flex items-center justify-between px-5 py-4">
+        <p className="font-[family-name:var(--font-mono)] text-xs uppercase tracking-widest text-slate-400">Work proof public</p>
         <button
           onClick={() => setGoalsPublic((v) => !v)}
-          className={`flex-shrink-0 w-11 h-6 rounded-full border transition-all duration-200 relative ${
-            goalsPublic ? "bg-white/20 border-white/30" : "bg-white/[0.04] border-white/10"
+          className={`flex-shrink-0 w-10 h-5 rounded-sm border transition-all duration-200 relative ${
+            goalsPublic ? "border-[#c9a84c]/50 bg-[#c9a84c]/10" : "border-white/10 bg-white/[0.02]"
           }`}
         >
-          <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ${goalsPublic ? "left-[22px]" : "left-0.5"}`} />
+          <span className={`absolute top-0.5 w-4 h-4 rounded-none transition-all duration-200 ${goalsPublic ? "left-[22px] bg-[#c9a84c]" : "left-0.5 bg-white/30"}`} />
         </button>
       </div>
 
       {/* Open to opportunities */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-0.5">
-          <p className="text-sm text-slate-200 font-medium">Open to Opportunities</p>
-          <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-400 leading-relaxed">
-            Display a badge on your public profile to signal you&apos;re available
-          </p>
-        </div>
+      <div className="flex items-center justify-between px-5 py-4">
+        <p className="font-[family-name:var(--font-mono)] text-xs uppercase tracking-widest text-slate-400">Available for work</p>
         <button
           onClick={() => setOpenToOpportunities((v) => !v)}
-          className={`flex-shrink-0 w-11 h-6 rounded-full border transition-all duration-200 relative ${
-            openToOpportunities ? "bg-white/20 border-white/30" : "bg-white/[0.04] border-white/10"
+          className={`flex-shrink-0 w-10 h-5 rounded-sm border transition-all duration-200 relative ${
+            openToOpportunities ? "border-[#c9a84c]/50 bg-[#c9a84c]/10" : "border-white/10 bg-white/[0.02]"
           }`}
         >
-          <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ${openToOpportunities ? "left-[22px]" : "left-0.5"}`} />
+          <span className={`absolute top-0.5 w-4 h-4 rounded-none transition-all duration-200 ${openToOpportunities ? "left-[22px] bg-[#c9a84c]" : "left-0.5 bg-white/30"}`} />
         </button>
       </div>
 
-      {/* Theme accent */}
-      <div className="flex items-center justify-between gap-4 pt-3 border-t border-white/[0.05]">
-        <div className="flex flex-col gap-0.5">
-          <p className="text-sm text-slate-200 font-medium">Theme Accent</p>
-          <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 leading-relaxed">
-            Personalizes accent colors across your dashboard
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {ACCENT_SWATCHES.map((swatch) => (
-            <button
-              key={swatch.key}
-              title={swatch.key}
-              onClick={() => { setThemeAccent(swatch.key); onAccentChange(swatch.key); }}
-              className={`w-7 h-7 rounded-full transition-all ${
-                themeAccent === swatch.key
-                  ? "ring-2 ring-white ring-offset-2 ring-offset-[#050508] scale-110"
-                  : "opacity-50 hover:opacity-90 hover:scale-110"
-              }`}
-              style={{ backgroundColor: swatch.hex }}
-            />
-          ))}
-        </div>
-      </div>
-
       {/* Referral link */}
-      <div className="flex flex-col gap-2 pt-3 border-t border-white/[0.05]">
-        <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.15em] text-slate-500 uppercase">
-          Your referral link
-        </p>
+      <div className="flex flex-col gap-3 px-5 py-5">
+        <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.15em] text-slate-600 uppercase">Referral link</p>
         <div className="flex items-center gap-2">
-          <div className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 overflow-hidden">
-            <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/35 truncate block">{referralLink}</span>
+          <div className="flex-1 bg-white/[0.02] border border-white/[0.06] rounded-sm px-3 py-2 overflow-hidden">
+            <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/30 truncate block">{referralLink}</span>
           </div>
           <button
             onClick={handleCopy}
-            className={`flex-shrink-0 rounded-lg px-3 py-2 font-[family-name:var(--font-mono)] text-[10px] text-slate-300 hover:text-slate-200 transition-all ${getButtonStyle(themeAccent, "secondary")}`}
+            className="flex-shrink-0 rounded-sm px-3 py-2 font-[family-name:var(--font-mono)] text-[10px] text-slate-400 hover:text-white border border-white/10 hover:border-white/20 transition-all"
           >
             {copied ? "Copied!" : "Copy"}
           </button>
         </div>
         {referralStats && (
-          <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500">
+          <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-600">
             {referralStats.count} referral{referralStats.count !== 1 ? "s" : ""} · {referralStats.xp_earned_total} XP earned
           </p>
         )}
       </div>
 
-      <button
-        onClick={save}
-        disabled={saving}
-        className={`w-full rounded-lg bg-white/[0.06] py-2.5 text-sm text-slate-200 hover:text-white/90 hover:bg-white/[0.1] disabled:opacity-40 transition-all ${getButtonStyle(themeAccent, "primary")}`}
-      >
-        {saved ? "Saved ✓" : saving ? "Saving…" : "Save settings"}
-      </button>
+      {/* Save */}
+      <div className="px-5 py-4">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="w-full rounded-sm border border-[#c9a84c]/30 hover:border-[#c9a84c]/60 bg-[#c9a84c]/[0.04] hover:bg-[#c9a84c]/[0.08] py-2.5 font-[family-name:var(--font-mono)] text-xs text-[#c9a84c] disabled:opacity-40 transition-all tracking-widest uppercase"
+        >
+          {saved ? "Saved ✓" : saving ? "Saving…" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }

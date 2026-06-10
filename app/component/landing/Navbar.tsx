@@ -13,10 +13,10 @@ interface XPState {
 }
 
 const XP_ACCENT_COLOR: Record<string, string> = {
-  cyan:    "#67e8f9",
-  violet:  "#c4b5fd",
-  emerald: "#6ee7b7",
-  amber:   "#fcd34d",
+  cyan:    "#c9a84c",
+  violet:  "#c9a84c",
+  emerald: "#c9a84c",
+  amber:   "#c9a84c",
 };
 
 function getXPCost(score: number): number {
@@ -27,7 +27,6 @@ function getXPCost(score: number): number {
 
 export default function Navbar() {
   const { data: session } = useSession();
-  const [hovered, setHovered] = useState(false);
   const [visible, setVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [xp, setXP] = useState<XPState | null>(null);
@@ -60,10 +59,6 @@ export default function Navbar() {
       .catch(() => {});
   }, [handle]);
 
-  const navLink = handle
-    ? { href: "/dashboard", text: "Dashboard →" }
-    : { href: "/login", text: "Sign in →" };
-
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
@@ -82,14 +77,8 @@ export default function Navbar() {
 
   return (
     <header
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-xl transition-all duration-500 ease-in-out ${
+      className={`fixed top-0 left-0 right-0 z-50 bg-[#0c0c14] border-b border-white/[0.08] transition-all duration-300 ${
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
-      } ${
-        hovered
-          ? "bg-[#050508]/60 border-b border-white/10"
-          : "bg-transparent border-b border-white/2"
       }`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 h-12">
@@ -105,12 +94,6 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-4">
-          <Link
-            href="/opportunities"
-            className="hidden sm:block font-[family-name:var(--font-mono)] text-xs text-slate-500 hover:text-slate-300 transition-colors"
-          >
-            Opportunities
-          </Link>
           {xp && (
             <div
               className="flex flex-col items-end gap-1"
@@ -133,12 +116,12 @@ export default function Navbar() {
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen((v) => !v)}
-                className="text-sm text-white/60 transition hover:text-white flex items-center gap-1"
+                className="font-[family-name:var(--font-mono)] text-xs text-white/60 transition hover:text-white flex items-center gap-1.5"
               >
-                Dashboard →
+                @{handle} ▾
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-40 bg-[#0c0c14] border border-white/10 rounded-xl overflow-hidden shadow-xl z-50">
+                <div className="absolute right-0 top-full mt-2 w-40 bg-[#0c0c14] border border-white/10 rounded-sm overflow-hidden shadow-xl z-50">
                   <Link
                     href="/dashboard"
                     onClick={() => setMenuOpen(false)}
@@ -172,6 +155,10 @@ export default function Navbar() {
           )}
         </div>
       </div>
+      <div
+        className="absolute bottom-0 left-6 w-16 h-[1px]"
+        style={{ background: "linear-gradient(90deg, rgba(201,168,76,0.6), rgba(201,168,76,0.3), transparent)" }}
+      />
     </header>
   );
 }

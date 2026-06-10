@@ -15,6 +15,14 @@ export const ACCENT_COLORS: Record<AccentKey, AccentConfig> = {
   amber:   { primary: "text-amber-300",   hover: "hover:text-amber-200",   bg: "bg-amber-500/10",   border: "border-amber-500/20",   hex: "#fcd34d" },
 };
 
-export function getAccent(accent?: string | null): AccentConfig {
-  return ACCENT_COLORS[(accent as AccentKey) ?? "cyan"] ?? ACCENT_COLORS.cyan;
+const GOLD_CONFIG: AccentConfig = {
+  primary: "text-[#c9a84c]",
+  hover:   "hover:text-[#c9a84c]/80",
+  bg:      "bg-[#c9a84c]/10",
+  border:  "border-[#c9a84c]/20",
+  hex:     "#c9a84c",
+};
+
+export function getAccent(_accent?: string | null): AccentConfig {
+  return GOLD_CONFIG;
 }

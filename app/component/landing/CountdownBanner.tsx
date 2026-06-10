@@ -13,9 +13,10 @@ function getTimeLeft(): string | null {
 }
 
 export default function CountdownBanner() {
-  const [timeLeft, setTimeLeft] = useState<string | null>(getTimeLeft)
+  const [timeLeft, setTimeLeft] = useState<string | null>(null)
 
   useEffect(() => {
+    setTimeLeft(getTimeLeft())
     const timer = setInterval(() => setTimeLeft(getTimeLeft()), 1000)
     return () => clearInterval(timer)
   }, [])

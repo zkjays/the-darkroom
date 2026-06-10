@@ -1,11 +1,67 @@
 @import "tailwindcss";
 
+:root {
+  --accent: #c9a84c;
+}
+
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-in-up {
   animation: fade-in-up 0.25s ease-out forwards;
+}
+
+/* === DARKROOM SPOTLIGHT — central overhead light === */
+.darkroom-spotlight {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: min(1100px, 120vw);
+  height: 1000px;
+  transform: translateX(-50%);
+  border-radius: 9999px;
+  background: radial-gradient(
+    ellipse 60% 55% at 50% 0%,
+    rgba(255,255,255,0.20) 0%,
+    rgba(200,230,255,0.09) 30%,
+    rgba(0,212,170,0.04) 55%,
+    transparent 72%
+  );
+  filter: blur(55px);
+  pointer-events: none;
+  animation: spotlightBreathe 9s ease-in-out infinite;
+}
+@keyframes spotlightBreathe {
+  0%, 100% { opacity: 0.80; transform: translateX(-50%) scale(1); }
+  50%       { opacity: 1;    transform: translateX(-50%) scale(1.04); }
+}
+
+/* Hero product mockup animations */
+@keyframes heroRise {
+  from { opacity: 0; transform: perspective(1800px) rotateX(8deg) translateY(28px); }
+  to   { opacity: 1; transform: perspective(1800px) rotateX(4deg) translateY(0); }
+}
+.hero-product {
+  animation: heroRise 0.8s cubic-bezier(0.22,1,0.36,1) 0.15s both;
+}
+.hero-mask-bottom {
+  -webkit-mask-image: linear-gradient(to bottom, #000 65%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 65%, transparent 100%);
+}
+
+/* Proof wall marquee */
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.proof-marquee { animation: marqueeScroll 40s linear infinite; }
+.proof-marquee:hover { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .darkroom-spotlight { animation: none; }
+  .hero-product { animation: none; }
+  .proof-marquee { animation: none; }
 }
 
 
@@ -171,8 +227,8 @@
     0deg,
     transparent,
     transparent 2px,
-    rgba(0,0,0,0.025) 2px,
-    rgba(0,0,0,0.025) 4px
+    rgba(0,0,0,0.04) 2px,
+    rgba(0,0,0,0.04) 4px
   );
 }
 

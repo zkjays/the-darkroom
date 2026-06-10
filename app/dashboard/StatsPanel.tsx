@@ -99,7 +99,7 @@ export function ProofCard({
 
 // ── ProofRing ───────────────────────────────────────────────────────────────
 export function ProofRing({
-  value, color, label, sublabel, onClick, hint, hoverGlow,
+  value, color, label, sublabel, onClick, hint,
 }: {
   value: number; color: string; label: string; sublabel: string;
   onClick?: () => void; hint?: string; hoverGlow?: string;
@@ -115,12 +115,12 @@ export function ProofRing({
       onClick={onClick}
     >
       <div
-        className={`relative transition-all duration-300 group-hover:scale-105 ${hoverGlow ?? ""}`}
+        className="relative transition-all duration-300 group-hover:scale-105"
         style={{ width: size, height: size }}
       >
         <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
           <circle cx={size / 2} cy={size / 2} r={radius}
-            fill="none" stroke={color + "20"} strokeWidth={strokeWidth} />
+            fill="none" stroke={color} strokeWidth={strokeWidth} opacity={0.1} />
           <circle cx={size / 2} cy={size / 2} r={radius}
             fill="none" stroke={color} strokeWidth={strokeWidth}
             strokeLinecap="round"
@@ -133,7 +133,7 @@ export function ProofRing({
         </div>
       </div>
       <div className="text-center">
-        <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] uppercase" style={{ color }}>{label}</p>
+        <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] text-white/60 uppercase">{label}</p>
         <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 tracking-[0.15em] uppercase">{sublabel}</p>
         {hint && (
           <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-600 mt-1">{hint}</p>

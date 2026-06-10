@@ -73,40 +73,40 @@ export default function CardGenerator({
       ctx.fillRect(0, 0, W, H);
 
       const bgGrad = ctx.createRadialGradient(600, 315, 0, 600, 315, 600);
-      bgGrad.addColorStop(0, "#0d0820");
+      bgGrad.addColorStop(0, "#08070f");
       bgGrad.addColorStop(1, "#020208");
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, W, H);
 
-      // Ambient glow — cyan top-left
+      // Ambient glow — gold warm left
       ctx.save();
       ctx.translate(240, 130);
       ctx.scale(420, 310);
-      const glowCyan = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-      glowCyan.addColorStop(0, "rgba(0,204,255,0.13)");
-      glowCyan.addColorStop(1, "rgba(0,204,255,0)");
-      ctx.fillStyle = glowCyan;
+      const glowLeft = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      glowLeft.addColorStop(0, "rgba(201,168,76,0.10)");
+      glowLeft.addColorStop(1, "rgba(201,168,76,0)");
+      ctx.fillStyle = glowLeft;
       ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
 
-      // Ambient glow — violet bottom-right
+      // Ambient glow — neutral dark right
       ctx.save();
       ctx.translate(1050, 580);
       ctx.scale(420, 310);
-      const glowViolet = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-      glowViolet.addColorStop(0, "rgba(139,92,246,0.12)");
-      glowViolet.addColorStop(1, "rgba(139,92,246,0)");
-      ctx.fillStyle = glowViolet;
+      const glowRight = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      glowRight.addColorStop(0, "rgba(201,168,76,0.06)");
+      glowRight.addColorStop(1, "rgba(201,168,76,0)");
+      ctx.fillStyle = glowRight;
       ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
 
-      // Ambient glow — mixed center
+      // Ambient glow — gold center pulse
       ctx.save();
       ctx.translate(600, 300);
       ctx.scale(500, 380);
       const glowCenter = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-      glowCenter.addColorStop(0, "rgba(0,204,255,0.09)");
-      glowCenter.addColorStop(0.5, "rgba(139,92,246,0.06)");
+      glowCenter.addColorStop(0, "rgba(201,168,76,0.07)");
+      glowCenter.addColorStop(0.5, "rgba(201,168,76,0.03)");
       glowCenter.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = glowCenter;
       ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
@@ -131,7 +131,7 @@ export default function CardGenerator({
       });
 
       // Subtle grid
-      ctx.strokeStyle = "rgba(125,211,252,0.025)";
+      ctx.strokeStyle = "rgba(255,255,255,0.018)";
       ctx.lineWidth = 1;
       for (let x = 0; x <= W; x += 150) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
@@ -172,21 +172,21 @@ export default function CardGenerator({
       ctx.translate(pfpCx, pfpCy);
       ctx.scale(200, 200);
       const pfpHalo = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-      pfpHalo.addColorStop(0, "rgba(0,204,255,0.18)");
-      pfpHalo.addColorStop(1, "rgba(0,204,255,0)");
+      pfpHalo.addColorStop(0, "rgba(201,168,76,0.14)");
+      pfpHalo.addColorStop(1, "rgba(201,168,76,0)");
       ctx.fillStyle = pfpHalo;
       ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
 
       ctx.beginPath();
       ctx.arc(pfpCx, pfpCy, 144, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(0,204,255,0.07)";
+      ctx.strokeStyle = "rgba(201,168,76,0.06)";
       ctx.lineWidth = 16;
       ctx.stroke();
 
       ctx.beginPath();
       ctx.arc(pfpCx, pfpCy, 137, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(0,204,255,0.18)";
+      ctx.strokeStyle = "rgba(201,168,76,0.40)";
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
@@ -222,7 +222,7 @@ export default function CardGenerator({
         const startY = bubbleCy + Math.sin(angle) * bubbleR;
         const grad = ctx.createLinearGradient(startX, startY, roomScoreEndX, roomScoreEndY);
         grad.addColorStop(0, color);
-        grad.addColorStop(1, "#00CCFF");
+        grad.addColorStop(1, "rgba(201,168,76,0.15)");
         ctx.save();
         ctx.globalAlpha = 0.2;
         ctx.strokeStyle = grad;
@@ -237,8 +237,8 @@ export default function CardGenerator({
         ctx.restore();
       };
 
-      drawTrail(175, 200, 100, "#a78bfa");
-      drawTrail(1025, 200, 100, "#60a5fa");
+      drawTrail(175, 200, 100, "rgba(201,168,76,0.5)");
+      drawTrail(1025, 200, 100, "rgba(201,168,76,0.4)");
 
       // ── PROOF BUBBLE HELPER ────────────────────────────────────
       const drawProofBubble = (
@@ -306,10 +306,10 @@ export default function CardGenerator({
         175, 200, socialProof,
         110, 100, 82,
         14, 1.5, 6,
-        "rgba(167,139,250,0.07)", "rgba(167,139,250,0.45)",
-        "rgba(167,139,250,0.07)", "rgba(167,139,250,0.82)",
-        "#c4b5fd", 1,
-        "rgba(167,139,250,1.0)", "rgba(167,139,250,0.6)",
+        "rgba(255,255,255,0.03)", "rgba(255,255,255,0.22)",
+        "rgba(255,255,255,0.04)", "rgba(255,255,255,0.70)",
+        "#ffffff", 0.85,
+        "rgba(255,255,255,0.65)", "rgba(255,255,255,0.35)",
         "SOCIAL", "PROOF",
         "700 48px 'Arial Black', Arial, sans-serif", "700 15px 'Courier New', monospace", "500 13px 'Courier New', monospace",
         200 + 32, 200 + 50
@@ -320,10 +320,10 @@ export default function CardGenerator({
         1025, 200, builderProof,
         110, 100, 82,
         14, 1.5, 6,
-        "rgba(96,165,250,0.07)", "rgba(96,165,250,0.45)",
-        "rgba(96,165,250,0.07)", "rgba(96,165,250,0.82)",
-        "#93c5fd", 1,
-        "rgba(96,165,250,1.0)", "rgba(96,165,250,0.6)",
+        "rgba(255,255,255,0.03)", "rgba(255,255,255,0.22)",
+        "rgba(255,255,255,0.04)", "rgba(255,255,255,0.70)",
+        "#ffffff", 0.85,
+        "rgba(255,255,255,0.65)", "rgba(255,255,255,0.35)",
         "BUILDER", "PROOF",
         "700 48px 'Arial Black', Arial, sans-serif", "700 15px 'Courier New', monospace", "500 13px 'Courier New', monospace",
         200 + 32, 200 + 50
@@ -346,8 +346,8 @@ export default function CardGenerator({
       ctx.translate(600, rsY + rsH / 2);
       ctx.scale(90, 36);
       const rsGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-      rsGlow.addColorStop(0, "rgba(0,204,255,0.13)");
-      rsGlow.addColorStop(1, "rgba(0,204,255,0)");
+      rsGlow.addColorStop(0, "rgba(201,168,76,0.12)");
+      rsGlow.addColorStop(1, "rgba(201,168,76,0)");
       ctx.fillStyle = rsGlow;
       ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
@@ -355,20 +355,20 @@ export default function CardGenerator({
       roundRect(ctx, rsX, rsY, rsW, rsH, rsRx);
       ctx.fillStyle = "#07060f";
       ctx.fill();
-      ctx.strokeStyle = "rgba(0,204,255,0.18)";
+      ctx.strokeStyle = "rgba(201,168,76,0.35)";
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
       ctx.font = "400 14px monospace";
-      ctx.fillStyle = "rgba(0,204,255,0.55)";
+      ctx.fillStyle = "rgba(201,168,76,0.55)";
       ctx.letterSpacing = "5px";
       ctx.fillText("ROOM SCORE", 600, 548);
       ctx.letterSpacing = "0px";
 
       ctx.font = "500 56px sans-serif";
-      ctx.fillStyle = "#00CCFF";
+      ctx.fillStyle = "#c9a84c";
       ctx.fillText(String(score), 600, 600);
 
       // ── HANDLE TAG ─────────────────────────────────────────────
@@ -441,20 +441,20 @@ export default function CardGenerator({
         style={{ position: "absolute", left: "-9999px", top: "-9999px" }}
       />
       {previewUrl && (
-        <div className="rounded-xl overflow-hidden border border-white/6">
+        <div className="rounded-sm overflow-hidden border border-white/[0.08]">
           <img src={previewUrl} alt="Darkroom ID card" className="w-full" />
         </div>
       )}
       <div className="flex gap-3">
         <button
           onClick={shareOnX}
-          className="flex-1 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)]"
+          className="flex-1 rounded-sm bg-white px-5 py-3 text-sm font-semibold text-black transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(255,255,255,0.08)]"
         >
           Share on X →
         </button>
         <button
           onClick={downloadCard}
-          className="rounded-xl border border-white/10 px-5 py-3 text-sm text-white/50 hover:text-white/80 hover:border-white/20 transition-all"
+          className="rounded-sm border border-white/10 px-5 py-3 text-sm text-white/50 hover:text-white/80 hover:border-white/20 transition-all"
         >
           Download
         </button>
