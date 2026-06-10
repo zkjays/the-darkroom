@@ -402,7 +402,7 @@ export default function Dashboard() {
 
               {data.updated_at && (Date.now() - new Date(data.updated_at).getTime()) > 7 * 24 * 60 * 60 * 1000 && (
                 <button
-                  onClick={() => { window.location.href = "/darkroom-id"; }}
+                  onClick={() => { window.location.href = "/darkroom-id?reanalyze=1"; }}
                   className="w-full rounded-sm border border-white/[0.07] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.04] py-3 font-[family-name:var(--font-mono)] text-xs text-slate-400 hover:text-white transition-all tracking-widest uppercase"
                 >
                   ↻ Re-analyze my ID
@@ -461,7 +461,7 @@ export default function Dashboard() {
             />
 
             {canReclaim ? (
-              <button onClick={() => router.push("/darkroom-id")}
+              <button onClick={() => router.push("/darkroom-id?reanalyze=1")}
                 className={`w-full rounded-xl px-5 py-3 text-sm text-slate-300 hover:text-white transition-all ${cs.secondaryBtn}`}>
                 Reclaim ID →
               </button>

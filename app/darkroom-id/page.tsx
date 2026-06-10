@@ -77,6 +77,8 @@ function DarkroomIDContent() {
   const [analysisOpen, setAnalysisOpen] = useState(false);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const hasRunRef = useRef(false);
+  const wantsReanalyze = searchParams.get("reanalyze") === "1";
 
   useEffect(() => {
     const ref = searchParams.get("ref");
@@ -91,13 +93,28 @@ function DarkroomIDContent() {
     }
     const handle = session?.handle;
     if (!handle) return;
-    // Always auto-analyze immediately — no quiz, no cooldown check
-    const autoAnswers = { handle, goals: [] };
-    setAnswers(autoAnswers);
-    setIsReclaim(true);
-    setStep(2);
-    setVisible(true);
-    submitQuiz(autoAnswers);
+    if (hasRunRef.current) return;
+    hasRunRef.current = true;
+
+    (async () => {
+      if (!wantsReanalyze) {
+        try {
+          const r = await fetch(`/api/check-claim?handle=${encodeURIComponent(handle)}`);
+          const d = await r.json();
+          if (d.already_claimed) {
+            router.replace("/dashboard");
+            return;
+          }
+        } catch { /* API error — proceed with analysis */ }
+      }
+
+      const autoAnswers = { handle, goals: [] };
+      setAnswers(autoAnswers);
+      setIsReclaim(wantsReanalyze);
+      setStep(2);
+      setVisible(true);
+      submitQuiz(autoAnswers);
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authStatus, session, router]);
 

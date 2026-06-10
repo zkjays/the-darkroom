@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  if (!checkRateLimit(handle, 3, 60 * 60 * 1000)) {
+  if (!checkRateLimit(handle, 10, 60 * 60 * 1000)) {
     console.warn(`generate: rate limit hit for handle=${handle}`);
     return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429 });
   }
@@ -140,6 +140,18 @@ export async function POST(req: NextRequest) {
   const bearerToken = process.env.BEARER_TOKEN;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const warnings: string[] = [];
+
+  // Preserve existing work_proof — never overwrite proofs accumulated by the user
+  let existingWorkProof = 0;
+  try {
+    const db = getServiceSupabase();
+    const { data: existing } = await db
+      .from("darkroom_ids")
+      .select("work_proof")
+      .eq("handle", handle)
+      .maybeSingle();
+    existingWorkProof = existing?.work_proof ?? 0;
+  } catch { /* ignore — default to 0 for new users */ }
 
   // STEP 1 & 2: Fetch X profile + tweets
   let bio = "";
@@ -266,15 +278,16 @@ export async function POST(req: NextRequest) {
     console.log("Fallback: using deterministic scoring (no API key)");
     warnings.push("claude_api_failed: No API key configured, using fallback scoring");
     const fallback = getFallbackResult(handle, goals, warnings);
+    const fallbackScore = Math.round((fallback.socialProof * 0.35) + (fallback.builderProof * 0.35) + (existingWorkProof * 0.30));
     try {
       const supabase = getServiceSupabase();
       const { error: upsertErr } = await supabase.from("darkroom_ids").upsert(
-        { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, archetype: fallback.archetype, tagline: fallback.tagline, darkroom_line: fallback.darkroom_line, analysis: fallback.analysis, generate_at: new Date().toISOString() },
+        { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: existingWorkProof, score: fallbackScore, archetype: fallback.archetype, tagline: fallback.tagline, darkroom_line: fallback.darkroom_line, analysis: fallback.analysis, generate_at: new Date().toISOString() },
         { onConflict: "handle" }
       );
       if (upsertErr) console.error("Supabase upsert (no-key fallback) failed:", JSON.stringify(upsertErr));
     } catch (dbErr) { console.error("Supabase upsert (no-key fallback) exception:", dbErr); }
-    return NextResponse.json({ ...fallback, profile_image_url: profileImageUrl || undefined });
+    return NextResponse.json({ ...fallback, workProof: existingWorkProof, profile_image_url: profileImageUrl || undefined });
   }
 
   console.log("Step 3: Calling Claude API");
@@ -362,15 +375,16 @@ Respond ONLY with JSON (no markdown, no backticks):
       console.log("Fallback: using deterministic scoring (Claude returned", claudeRes.status, ")");
       warnings.push(`claude_api_failed: AI generation failed (${claudeRes.status}), using fallback scoring`);
       const fallback = getFallbackResult(handle, goals, warnings);
+      const fallbackScore2 = Math.round((fallback.socialProof * 0.35) + (fallback.builderProof * 0.35) + (existingWorkProof * 0.30));
       try {
         const supabase = getServiceSupabase();
         const { error: upsertErr } = await supabase.from("darkroom_ids").upsert(
-          { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, archetype: fallback.archetype, tagline: fallback.tagline, darkroom_line: fallback.darkroom_line, analysis: fallback.analysis, generate_at: new Date().toISOString() },
+          { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: existingWorkProof, score: fallbackScore2, archetype: fallback.archetype, tagline: fallback.tagline, darkroom_line: fallback.darkroom_line, analysis: fallback.analysis, generate_at: new Date().toISOString() },
           { onConflict: "handle" }
         );
         if (upsertErr) console.error("Supabase upsert (claude-fail fallback) failed:", JSON.stringify(upsertErr));
       } catch (dbErr) { console.log("Supabase upsert (fallback) failed:", dbErr); }
-      return NextResponse.json({ ...fallback, profile_image_url: profileImageUrl || undefined });
+      return NextResponse.json({ ...fallback, workProof: existingWorkProof, profile_image_url: profileImageUrl || undefined });
     }
 
     const claudeData = await claudeRes.json();
@@ -386,14 +400,13 @@ Respond ONLY with JSON (no markdown, no backticks):
 
     const socialProof  = Math.min(100, Math.max(0, Math.round(parsed.social_proof)));
     const builderProof = Math.min(100, Math.max(0, Math.round(parsed.builder_proof)));
-    const workProof    = 0;
-    const baseScore    = Math.round((socialProof * 0.35) + (builderProof * 0.35) + (workProof * 0.30));
+    const baseScore    = Math.round((socialProof * 0.35) + (builderProof * 0.35) + (existingWorkProof * 0.30));
     const totalScore   = baseScore;
 
     try {
       const supabase = getServiceSupabase();
       const { error: upsertErr } = await supabase.from("darkroom_ids").upsert(
-        { handle, social_proof: socialProof, builder_proof: builderProof, work_proof: workProof, score: baseScore, archetype: parsed.archetype, tagline: parsed.tagline, darkroom_line: parsed.darkroom_line, analysis: parsed.analysis, generate_at: new Date().toISOString() },
+        { handle, social_proof: socialProof, builder_proof: builderProof, work_proof: existingWorkProof, score: baseScore, archetype: parsed.archetype, tagline: parsed.tagline, darkroom_line: parsed.darkroom_line, analysis: parsed.analysis, generate_at: new Date().toISOString() },
         { onConflict: "handle" }
       );
       if (upsertErr) console.error("Supabase upsert (claude success) error:", JSON.stringify(upsertErr));
@@ -407,7 +420,7 @@ Respond ONLY with JSON (no markdown, no backticks):
       totalScore,
       socialProof,
       builderProof,
-      workProof,
+      workProof: existingWorkProof,
       archetype: parsed.archetype,
       tagline: parsed.tagline,
       analysis: parsed.analysis,
@@ -424,13 +437,14 @@ Respond ONLY with JSON (no markdown, no backticks):
     console.log("Fallback: using deterministic scoring —", reason);
     warnings.push(`claude_api_failed: ${reason}, using fallback scoring`);
     const fallback = getFallbackResult(handle, goals, warnings);
+    const fallbackScore3 = Math.round((fallback.socialProof * 0.35) + (fallback.builderProof * 0.35) + (existingWorkProof * 0.30));
     try {
       const supabase = getServiceSupabase();
       await supabase.from("darkroom_ids").upsert(
-        { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: fallback.workProof, score: fallback.score, generate_at: new Date().toISOString() },
+        { handle, social_proof: fallback.socialProof, builder_proof: fallback.builderProof, work_proof: existingWorkProof, score: fallbackScore3, generate_at: new Date().toISOString() },
         { onConflict: "handle" }
       );
     } catch (dbErr) { console.log("Supabase upsert (fallback) failed:", dbErr); }
-    return NextResponse.json({ ...fallback, profile_image_url: profileImageUrl || undefined });
+    return NextResponse.json({ ...fallback, workProof: existingWorkProof, profile_image_url: profileImageUrl || undefined });
   }
 }
