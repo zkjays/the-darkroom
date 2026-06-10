@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
 
   if (insertError) {
     console.error("Goal insert error:", JSON.stringify(insertError));
-    return NextResponse.json({ error: "Failed to create goal" }, { status: 500 });
+    return NextResponse.json({ error: insertError.message ?? "Failed to create goal", code: insertError.code }, { status: 500 });
   }
 
   // If direct-complete (Work submission), run XP logic + update work_proof immediately
@@ -284,43 +284,48 @@ export async function PATCH(req: NextRequest) {
   if (body.recalculate) {
     const handle = sessionHandle(session);
     if (!handle) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const db = getServiceSupabase();
+    try {
+      const db = getServiceSupabase();
 
-    const { data: allProofs } = await db
-      .from("daily_goals")
-      .select("proof_type, endorsement_count")
-      .eq("handle", handle)
-      .eq("status", "completed")
-      .not("proof_value", "is", null);
+      const { data: allProofs } = await db
+        .from("daily_goals")
+        .select("proof_type, endorsement_count")
+        .eq("handle", handle)
+        .eq("status", "completed")
+        .not("proof_value", "is", null);
 
-    const totalPoints = (allProofs ?? []).reduce((sum: number, p: { proof_type: string; endorsement_count: number | null }) => {
-      const base = PROOF_POINTS[p.proof_type] ?? 3;
-      const count = p.endorsement_count ?? 0;
-      const multiplier = count >= 3 ? 1.5 : count >= 1 ? 1.0 : 0.5;
-      return sum + Math.round(base * multiplier);
-    }, 0);
+      const totalPoints = (allProofs ?? []).reduce((sum: number, p: { proof_type: string; endorsement_count: number | null }) => {
+        const base = PROOF_POINTS[p.proof_type] ?? 3;
+        const count = p.endorsement_count ?? 0;
+        const multiplier = count >= 3 ? 1.5 : count >= 1 ? 1.0 : 0.5;
+        return sum + Math.round(base * multiplier);
+      }, 0);
 
-    const newWorkProof = Math.min(100, Math.round((totalPoints / 50) * 100));
+      const newWorkProof = Math.min(100, Math.round((totalPoints / 50) * 100));
 
-    const { data: idRow } = await db
-      .from("darkroom_ids")
-      .select("social_proof, builder_proof, bonus_points")
-      .eq("handle", handle)
-      .single();
-
-    if (idRow) {
-      const newRoomScore = Math.round(
-        (idRow.social_proof ?? 0) * 0.35 +
-        (idRow.builder_proof ?? 0) * 0.35 +
-        newWorkProof * 0.30
-      );
-      await db
+      const { data: idRow } = await db
         .from("darkroom_ids")
-        .update({ work_proof: newWorkProof, score: newRoomScore })
-        .eq("handle", handle);
-    }
+        .select("social_proof, builder_proof, bonus_points")
+        .eq("handle", handle)
+        .single();
 
-    return NextResponse.json({ work_proof: newWorkProof });
+      if (idRow) {
+        const newRoomScore = Math.round(
+          (idRow.social_proof ?? 0) * 0.35 +
+          (idRow.builder_proof ?? 0) * 0.35 +
+          newWorkProof * 0.30
+        );
+        await db
+          .from("darkroom_ids")
+          .update({ work_proof: newWorkProof, score: newRoomScore })
+          .eq("handle", handle);
+      }
+
+      return NextResponse.json({ work_proof: newWorkProof });
+    } catch (e) {
+      console.error("recalculate error:", e);
+      return NextResponse.json({ work_proof: 0 });
+    }
   }
 
   const { handle: authHandle, goal_id, proof_value } = body;
