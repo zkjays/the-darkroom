@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { sanitizeHandle } from "@/app/lib/sanitize";
 
@@ -127,6 +129,14 @@ export async function POST(req: NextRequest) {
   console.log("API ROUTE HIT", new Date().toISOString());
   const { handle: rawHandle, goals } = await req.json();
   const handle = sanitizeHandle(rawHandle ?? "");
+
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (sanitizeHandle(session.handle ?? "") !== handle) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   if (!handle || !goals || !Array.isArray(goals)) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });

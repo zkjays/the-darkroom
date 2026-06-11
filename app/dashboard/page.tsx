@@ -25,7 +25,7 @@ function PfpPlaceholder({ handle, size }: { handle: string; size: number }) {
       className="rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0"
       style={{ width: size, height: size }}
     >
-      <span className="text-slate-300 font-bold" style={{ fontSize: size * 0.38 }}>
+      <span className="text-white/75 font-bold" style={{ fontSize: size * 0.38 }}>
         {handle.charAt(0).toUpperCase()}
       </span>
     </div>
@@ -171,7 +171,7 @@ export default function Dashboard() {
         <Navbar />
         <main className="flex min-h-screen items-center justify-center px-6">
           <div className="text-center flex flex-col gap-4">
-            <p className="text-slate-300 text-sm">No Darkroom ID found.</p>
+            <p className="text-white/75 text-sm">No Darkroom ID found.</p>
             <a href="/darkroom-id"
               className="rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black hover:-translate-y-0.5 transition-all">
               Take the quiz →
@@ -216,7 +216,7 @@ export default function Dashboard() {
                 onClick={() => setActiveTab(tab.id)}
                 style={isActive ? { borderColor: "rgba(201,168,76,0.45)", color: "#c9a84c" } : { borderColor: "transparent" }}
                 className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 transition-all w-full text-left ${
-                  isActive ? "" : "text-slate-600 hover:text-slate-300 hover:border-white/[0.06]"
+                  isActive ? "" : "text-white/50 hover:text-white hover:border-white/[0.15]"
                 }`}
               >
                 <span className="flex-shrink-0 w-5 h-5">
@@ -261,18 +261,18 @@ export default function Dashboard() {
                   {totalScore}
                 </div>
                 {bonusPoints > 0 ? (
-                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
+                  <p className="font-[family-name:var(--font-mono)] text-xs text-white/55">
                     Base {data.score} + {bonusPoints} bonus
                   </p>
                 ) : (
-                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">
+                  <p className="font-[family-name:var(--font-mono)] text-xs text-white/40">
                     Base score · earn up to +25 from certs
                   </p>
                 )}
                 <div className="mt-2 text-base font-extrabold tracking-tight text-white">{data.archetype}</div>
                 <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-white/45 uppercase">{data.tagline}</p>
                 {streak && streak.current_streak > 0 && (
-                  <span className="mt-2 self-start bg-white/[0.05] border border-white/[0.08] text-slate-300 text-xs px-2.5 py-1 rounded-full">
+                  <span className="mt-2 self-start bg-white/[0.05] border border-white/[0.08] text-white/75 text-xs px-2.5 py-1 rounded-full">
                     🔥 {streak.current_streak} day streak
                   </span>
                 )}
@@ -284,12 +284,12 @@ export default function Dashboard() {
                   <ProfileImage url={data.profile_image_url} handle={data.handle} size={72} />
                   <div className="absolute inset-0 rounded-full bg-black/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <span className={`font-[family-name:var(--font-mono)] text-xl font-bold ${accentCls}`}>{totalScore}</span>
-                    <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-400">/100</span>
+                    <span className="font-[family-name:var(--font-mono)] text-[9px] text-white/55">/100</span>
                   </div>
                 </div>
                 <span className="text-sm font-medium text-white">@{data.handle}</span>
-                <span className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500">{data.archetype}</span>
-                <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-600">hover to see score</span>
+                <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/40">{data.archetype}</span>
+                <span className="font-[family-name:var(--font-mono)] text-[9px] text-white/35">hover to see score</span>
               </div>
             </div>
 
@@ -349,11 +349,11 @@ export default function Dashboard() {
                     </div>
                     <div className="text-center">
                       <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] uppercase" style={{ color: "#c9a84c" }}>WORK</p>
-                      <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 tracking-[0.15em] uppercase">PROOF</p>
+                      <p className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 tracking-[0.15em] uppercase">PROOF</p>
                     </div>
                     <button
                       onClick={() => setActiveTab("work")}
-                      className="font-[family-name:var(--font-mono)] text-[10px] text-slate-600 hover:text-slate-400 cursor-pointer transition-colors"
+                      className="font-[family-name:var(--font-mono)] text-[10px] text-white/35 hover:text-white/55 cursor-pointer transition-colors"
                     >
                       Submit proofs in Work tab →
                     </button>
@@ -368,7 +368,7 @@ export default function Dashboard() {
                 <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase`}>Analysis</p>
                 <button
                   onClick={() => setAnalysisOpen((v) => !v)}
-                  className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+                  className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 hover:text-white/75 transition-colors"
                 >
                   {analysisOpen ? "Collapse ↑" : "Read analysis ↓"}
                 </button>
@@ -377,7 +377,7 @@ export default function Dashboard() {
                 style={{ maxHeight: analysisOpen ? "600px" : "0", overflow: "hidden", transition: "max-height 350ms ease" }}
               >
                 <p className="text-sm text-slate-200 leading-7 mt-3">{data.analysis}</p>
-                <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.1em] text-slate-300 italic mt-4">{data.darkroom_line}</p>
+                <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.1em] text-white/75 italic mt-4">{data.darkroom_line}</p>
               </div>
             </div>
 
@@ -403,7 +403,7 @@ export default function Dashboard() {
               {data.updated_at && (Date.now() - new Date(data.updated_at).getTime()) > 7 * 24 * 60 * 60 * 1000 && (
                 <button
                   onClick={() => { window.location.href = "/darkroom-id?reanalyze=1"; }}
-                  className="w-full rounded-sm border border-white/[0.07] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.04] py-3 font-[family-name:var(--font-mono)] text-xs text-slate-400 hover:text-white transition-all tracking-widest uppercase"
+                  className="w-full rounded-sm border border-white/[0.07] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.04] py-3 font-[family-name:var(--font-mono)] text-xs text-white/55 hover:text-white transition-all tracking-widest uppercase"
                 >
                   ↻ Re-analyze my ID
                 </button>
@@ -412,10 +412,10 @@ export default function Dashboard() {
 
             {/* Coming soon */}
             <div className={`${cs.nestedCard} rounded-xl px-5 py-4 text-center`}>
-              <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400">
+              <p className="font-[family-name:var(--font-mono)] text-xs text-white/55">
                 Lessons &amp; Certifications coming soon.
               </p>
-              <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 mt-1">
+              <p className="font-[family-name:var(--font-mono)] text-xs text-white/40 mt-1">
                 Your score has room to grow. Stay in The Darkroom.
               </p>
             </div>
@@ -441,12 +441,12 @@ export default function Dashboard() {
 
             {profilePublic && (
               <div className={`${cs.nestedCard} flex items-center justify-between gap-4 rounded-xl px-5 py-3`}>
-                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-300">
-                  🌍 Your profile is public · <span className="text-slate-500">{profileLink}</span>
+                <p className="font-[family-name:var(--font-mono)] text-xs text-white/75">
+                  🌍 Your profile is public · <span className="text-white/40">{profileLink}</span>
                 </p>
                 <button
                   onClick={() => { copyToClipboard(profileLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
-                  className="flex-shrink-0 font-[family-name:var(--font-mono)] text-[10px] text-slate-400 hover:text-slate-200 border border-white/[0.06] hover:border-white/20 rounded-full px-3 py-1 transition-all"
+                  className="flex-shrink-0 font-[family-name:var(--font-mono)] text-[10px] text-white/55 hover:text-slate-200 border border-white/[0.06] hover:border-white/20 rounded-full px-3 py-1 transition-all"
                 >
                   {linkCopied ? "Copied!" : "Copy link"}
                 </button>
@@ -462,18 +462,18 @@ export default function Dashboard() {
 
             {canReclaim ? (
               <button onClick={() => router.push("/darkroom-id?reanalyze=1")}
-                className={`w-full rounded-xl px-5 py-3 text-sm text-slate-300 hover:text-white transition-all ${cs.secondaryBtn}`}>
+                className={`w-full rounded-xl px-5 py-3 text-sm text-white/75 hover:text-white transition-all ${cs.secondaryBtn}`}>
                 Reclaim ID →
               </button>
             ) : (
-              <div className="w-full rounded-xl border border-white/[0.05] px-5 py-3 text-sm text-slate-500 text-center cursor-not-allowed select-none">
+              <div className="w-full rounded-xl border border-white/[0.05] px-5 py-3 text-sm text-white/40 text-center cursor-not-allowed select-none">
                 Reclaim in {daysLeft} day{daysLeft !== 1 ? "s" : ""}
               </div>
             )}
 
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
-              className="w-full text-xs text-slate-500 hover:text-slate-300 transition-colors text-center py-2">
+              className="w-full text-xs text-white/40 hover:text-white/75 transition-colors text-center py-2">
               Sign out
             </button>
           </div>
@@ -484,7 +484,7 @@ export default function Dashboard() {
       {/* ── TOUR BUTTON ── */}
       <button
         onClick={() => setTourStep(0)}
-        className="fixed bottom-6 right-[4.5rem] z-40 text-xs font-[family-name:var(--font-mono)] px-3 py-2 rounded-sm bg-[#0c0c14] border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-all tracking-widest"
+        className="fixed bottom-6 right-[4.5rem] z-40 text-xs font-[family-name:var(--font-mono)] px-3 py-2 rounded-sm bg-[#0c0c14] border border-white/10 text-white/55 hover:text-white hover:border-white/20 transition-all tracking-widest"
       >
         ◈ Discover
       </button>
@@ -494,10 +494,10 @@ export default function Dashboard() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center px-4">
           <div className="max-w-sm w-full bg-[#0c0c14] border border-white/[0.10] rounded-sm p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <span className="font-[family-name:var(--font-mono)] text-[10px] text-slate-600 tracking-widest">
+              <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/35 tracking-widest">
                 STEP {tourStep + 1} / {TOUR_STEPS.length}
               </span>
-              <button onClick={() => setTourStep(null)} className="text-slate-600 hover:text-white text-lg leading-none transition-colors">×</button>
+              <button onClick={() => setTourStep(null)} className="text-white/35 hover:text-white text-lg leading-none transition-colors">×</button>
             </div>
             <div className="w-full h-[2px] bg-white/5 rounded-full">
               <div
@@ -514,12 +514,12 @@ export default function Dashboard() {
               </span>
               <h3 className="text-white font-bold text-base">{TOUR_STEPS[tourStep].title}</h3>
             </div>
-            <p className="text-slate-300 text-sm leading-relaxed">
+            <p className="text-white/75 text-sm leading-relaxed">
               {TOUR_STEPS[tourStep].content}
             </p>
             {TOUR_STEPS[tourStep].hint && (
               <div className="bg-white/[0.03] border border-white/[0.06] rounded-sm px-4 py-3">
-                <p className="font-[family-name:var(--font-mono)] text-slate-500 text-xs leading-relaxed">
+                <p className="font-[family-name:var(--font-mono)] text-white/40 text-xs leading-relaxed">
                   ◈ {TOUR_STEPS[tourStep].hint}
                 </p>
               </div>
@@ -527,7 +527,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between pt-2">
               <button
                 onClick={() => tourStep > 0 ? setTourStep(tourStep - 1) : setTourStep(null)}
-                className="font-[family-name:var(--font-mono)] text-xs text-slate-500 hover:text-white transition-colors"
+                className="font-[family-name:var(--font-mono)] text-xs text-white/40 hover:text-white transition-colors"
               >
                 {tourStep > 0 ? "← Back" : "Skip"}
               </button>
@@ -570,18 +570,18 @@ export default function Dashboard() {
                 </span>
                 <button
                   onClick={() => setProofModal(null)}
-                  className="text-slate-500 hover:text-white text-xl leading-none transition-colors"
+                  className="text-white/40 hover:text-white text-xl leading-none transition-colors"
                 >
                   ×
                 </button>
               </div>
               <div className="text-white font-bold text-lg mb-3">{advice.tierLabel}</div>
-              <div className="text-slate-300 text-sm leading-relaxed space-y-3">
+              <div className="text-white/75 text-sm leading-relaxed space-y-3">
                 {advice.advice.map((line, i) => (
                   <p key={i}>{line}</p>
                 ))}
               </div>
-              <div className="mt-4 pt-4 border-t border-white/5 font-[family-name:var(--font-mono)] text-xs text-slate-500">
+              <div className="mt-4 pt-4 border-t border-white/5 font-[family-name:var(--font-mono)] text-xs text-white/40">
                 {advice.actionHint}
               </div>
             </div>

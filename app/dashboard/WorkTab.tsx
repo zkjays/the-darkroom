@@ -180,15 +180,15 @@ export function WorkTab({
               onClick={() => setFormOpen(true)}
               className="border border-white/[0.08] rounded-sm p-6 bg-white/[0.02] cursor-pointer hover:border-[#c9a84c]/20 hover:bg-white/[0.03] transition-all flex flex-col items-center justify-center gap-3 min-h-[180px]"
             >
-              <span className="text-2xl text-slate-500">+</span>
-              <span className="font-[family-name:var(--font-mono)] text-sm text-slate-400">Submit Your Work</span>
+              <span className="text-2xl text-white/40">+</span>
+              <span className="font-[family-name:var(--font-mono)] text-sm text-white/55">Submit Your Work</span>
             </div>
           ) : (
             <div className="border border-white/[0.08] rounded-sm p-8 bg-white/[0.02] flex flex-col gap-6">
 
               {/* Title */}
               <div>
-                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-widest mb-2">Title</label>
+                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-2">Title</label>
                 <input
                   type="text"
                   placeholder="What did you build?"
@@ -201,7 +201,7 @@ export function WorkTab({
 
               {/* URL */}
               <div>
-                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-widest mb-2">Link</label>
+                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-2">Link</label>
                 <input
                   type="url"
                   placeholder="Link to your work"
@@ -211,13 +211,13 @@ export function WorkTab({
                   className="w-full bg-white/[0.04] border border-white/[0.10] rounded-sm px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-[#c9a84c]/40 transition-colors"
                 />
                 {ogLoading && (
-                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400 mt-1">Fetching preview…</p>
+                  <p className="font-[family-name:var(--font-mono)] text-xs text-white/55 mt-1">Fetching preview…</p>
                 )}
               </div>
 
               {/* Type tags */}
               <div>
-                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-widest mb-3">Type</label>
+                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-3">Type</label>
                 <div className="flex gap-2 flex-wrap">
                   {WORK_PROOF_TYPES.map((type) => (
                     <button
@@ -238,7 +238,7 @@ export function WorkTab({
 
               {/* Date */}
               <div>
-                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-widest mb-2">
+                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-2">
                   When did you build this?
                 </label>
                 <input
@@ -251,7 +251,7 @@ export function WorkTab({
 
               {/* Description */}
               <div className="relative">
-                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-widest mb-2">Description</label>
+                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-2">Description</label>
                 <textarea
                   placeholder="Tell us more (optional)"
                   value={description}
@@ -260,43 +260,52 @@ export function WorkTab({
                   rows={3}
                   className="w-full bg-white/[0.04] border border-white/[0.10] rounded-sm px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-[#c9a84c]/40 transition-colors resize-none"
                 />
-                <span className="absolute right-3 bottom-3 font-[family-name:var(--font-mono)] text-xs text-slate-400 pointer-events-none">
+                <span className="absolute right-3 bottom-3 font-[family-name:var(--font-mono)] text-xs text-white/55 pointer-events-none">
                   {description.length}/280
                 </span>
               </div>
 
-              {/* Image preview or upload */}
-              {ogImage ? (
-                <div className="relative rounded-sm overflow-hidden aspect-video bg-[#0c0c14]">
-                  <img src={ogImage} alt="Preview" className="w-full h-full object-cover opacity-70" />
-                  <button
-                    onClick={() => setOgImage(null)}
-                    className="absolute top-2 right-2 text-slate-400 hover:text-white bg-black/60 rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
-                  >
-                    ×
-                  </button>
-                </div>
-              ) : (
-                <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-sm hover:text-white transition-colors">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file || file.size > 2 * 1024 * 1024) return;
-                      const reader = new FileReader();
-                      reader.onload = () => setOgImage(reader.result as string);
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                  ↑ Upload image
+              {/* Image upload — square, Instagram-style */}
+              <div>
+                <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-2">
+                  Cover image
                 </label>
-              )}
+                {ogImage ? (
+                  <div className="relative rounded-sm overflow-hidden aspect-square bg-[#0c0c14] w-full max-w-[260px]">
+                    <img src={ogImage} alt="Preview" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => setOgImage(null)}
+                      className="absolute top-2 right-2 text-white/55 hover:text-white bg-black/70 rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-3 cursor-pointer rounded-sm border border-dashed border-white/[0.12] hover:border-[#c9a84c]/30 bg-white/[0.02] hover:bg-[#c9a84c]/[0.02] transition-all aspect-square w-full max-w-[260px]">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || file.size > 5 * 1024 * 1024) return;
+                        const reader = new FileReader();
+                        reader.onload = () => setOgImage(reader.result as string);
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                    <span className="text-2xl opacity-20">↑</span>
+                    <div className="text-center">
+                      <p className="font-[family-name:var(--font-mono)] text-xs text-white/55">Drop your cover</p>
+                      <p className="font-[family-name:var(--font-mono)] text-[9px] text-white/30 mt-1">1080 × 1080 · square · max 5MB</p>
+                    </div>
+                  </label>
+                )}
+              </div>
 
               {/* Public toggle */}
               <div className="flex items-center justify-between">
-                <span className="font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-widest text-slate-400">Public</span>
+                <span className="font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/55">Public</span>
                 <button
                   onClick={() => setIsPublic((v) => !v)}
                   className={`flex-shrink-0 w-10 h-5 rounded-sm border transition-all duration-200 relative ${
@@ -307,34 +316,34 @@ export function WorkTab({
                 </button>
               </div>
 
-              {/* Submit + cancel */}
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={resetForm}
-                  className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  Cancel
-                </button>
+              {/* Publish — full width, impactful */}
+              <div className="flex flex-col gap-2 pt-2">
                 <button
                   onClick={submit}
                   disabled={!title.trim() || !url.trim() || submitting}
-                  className="font-[family-name:var(--font-mono)] text-xs px-4 py-2 rounded-sm border border-[#c9a84c]/40 hover:border-[#c9a84c]/70 bg-[#c9a84c]/[0.06] hover:bg-[#c9a84c]/[0.10] text-[#c9a84c] transition-all disabled:opacity-30 disabled:cursor-not-allowed tracking-widest uppercase"
+                  className="w-full font-[family-name:var(--font-mono)] text-sm py-3 rounded-sm border transition-all tracking-widest uppercase disabled:opacity-25 disabled:cursor-not-allowed"
+                  style={
+                    !title.trim() || !url.trim() || submitting
+                      ? { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.25)", backgroundColor: "transparent" }
+                      : { borderColor: "#c9a84c", color: "#0a0a0a", backgroundColor: "#c9a84c" }
+                  }
                 >
-                  {submitting ? "Submitting…" : "Submit Proof"}
+                  {submitting ? "Publishing…" : `Publish — +${WORK_PROOF_POINTS[proofType] ?? 3} pts`}
+                </button>
+                <button
+                  onClick={resetForm}
+                  className="w-full font-[family-name:var(--font-mono)] text-[10px] text-white/40 hover:text-white/75 transition-colors py-1"
+                >
+                  Cancel
                 </button>
               </div>
-
-              {/* Points preview */}
-              <p className="font-[family-name:var(--font-mono)] text-sm text-slate-300 text-center">
-                This proof is worth {WORK_PROOF_POINTS[proofType] ?? 3} pts
-              </p>
             </div>
           )}
         </div>
 
         {/* RIGHT: Connected accounts */}
         <div>
-          <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 tracking-widest mb-6">PROOF SYSTEMS</p>
+          <p className="font-[family-name:var(--font-mono)] text-xs text-white/40 tracking-widest mb-6">PROOF SYSTEMS</p>
           <div className="flex flex-col gap-4">
             {[
               { icon: "G", label: "GitHub",      description: "Auto-verify repos & PRs",    status: "Coming soon",          active: false },
@@ -347,12 +356,12 @@ export function WorkTab({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white">{label}</p>
-                  <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500">{description}</p>
+                  <p className="font-[family-name:var(--font-mono)] text-[10px] text-white/40">{description}</p>
                 </div>
                 <span className={`font-[family-name:var(--font-mono)] text-[10px] px-2 py-0.5 rounded-sm flex-shrink-0 ${
                   active
                     ? "bg-[#c9a84c]/10 text-[#c9a84c] border border-[#c9a84c]/25"
-                    : "bg-white/5 text-slate-500 border border-white/10"
+                    : "bg-white/5 text-white/40 border border-white/10"
                 }`}>
                   {status}
                 </span>
@@ -362,78 +371,100 @@ export function WorkTab({
         </div>
       </div>
 
-      {/* ── BOTTOM: Proof gallery ── */}
-      <div>
-        <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 tracking-widest mb-6">YOUR WORK</p>
+      {/* ── BOTTOM: Proof gallery — pleine largeur, style Instagram ── */}
+      <div className="-mx-6 -mb-8">
         {loadingWorks ? (
-          <div className="py-6 flex justify-center">
+          <div className="py-10 flex justify-center">
             <div className="w-4 h-4 rounded-full border border-white/15 border-t-white/40 animate-spin" />
           </div>
         ) : works.length === 0 ? (
-          <div className="border border-white/[0.06] rounded-sm px-5 py-10 text-center">
-            <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500">No work submitted yet. Start building.</p>
+          <div className="px-6 pb-6">
+            <div className="border border-white/[0.06] rounded-sm px-5 py-10 text-center">
+              <p className="font-[family-name:var(--font-mono)] text-xs text-white/40">No work submitted yet. Start building.</p>
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-2 px-0.5 pb-0.5">
             {works.map((proof) => {
               const endorsementCount = proof.endorsement_count ?? 0;
+              const isFeatured = endorsementCount >= 6;
+              const isValidated = endorsementCount >= 3;
               return (
                 <div
                   key={proof.id}
                   onClick={() => setSelectedWork(proof)}
-                  className="relative group cursor-pointer rounded-sm overflow-hidden border border-white/[0.06] hover:border-white/20 transition-all min-h-[220px] bg-[#0c0c14]"
+                  className="group relative aspect-square overflow-hidden cursor-pointer bg-[#0e0e12] transition-shadow duration-300"
+                  style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.45)" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 28px rgba(0,0,0,0.75)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 10px rgba(0,0,0,0.45)"; }}
                 >
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openEditModal(proof); }}
-                    className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-sm p-1.5 text-slate-400 hover:text-white text-xs"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteProof(proof.id); }}
-                    className={`absolute top-2 left-9 z-10 opacity-0 group-hover:opacity-100 transition-opacity rounded-sm p-1.5 text-xs ${
-                      deletingId === proof.id
-                        ? "bg-red-500/80 text-white opacity-100"
-                        : "bg-black/60 text-red-400/60 hover:text-red-400"
-                    }`}
-                    title={deletingId === proof.id ? "Click again to confirm delete" : "Delete proof"}
-                  >
-                    {deletingId === proof.id ? "?" : "✕"}
-                  </button>
-
-                  {proof.edited && (proof.endorsement_count ?? 0) >= 3 && (
-                    <div className="absolute top-2 left-8 z-10">
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-sm bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        Edited
-                      </span>
-                    </div>
-                  )}
-
+                  {/* Image or placeholder */}
                   {proof.image_url ? (
                     <img
                       src={proof.image_url}
                       alt={proof.goal_text}
-                      className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity absolute inset-0"
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                     />
                   ) : (
-                    <div className="w-full h-full absolute inset-0 flex items-center justify-center">
-                      <span className="text-4xl opacity-10">{WORK_TYPE_ICONS[proof.proof_type] ?? "·"}</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                      <span className="text-4xl" style={{ color: accentHex, opacity: 0.25 }}>
+                        {WORK_TYPE_ICONS[proof.proof_type] ?? "·"}
+                      </span>
+                      <span className="font-[family-name:var(--font-mono)] text-[8px] tracking-[0.2em]" style={{ color: accentHex, opacity: 0.4 }}>
+                        {proof.proof_type?.toUpperCase()}
+                      </span>
                     </div>
                   )}
 
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                    <p className="text-white text-sm font-medium">{proof.goal_text}</p>
-                    <p className="text-slate-400 text-xs font-mono mt-1">{proof.proof_type}</p>
+                  {/* Hover overlay — gradient bas + texte très lisible */}
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 gap-1.5"
+                    style={{ background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.55) 50%, transparent 100%)" }}
+                  >
+                    <p
+                      className="text-white font-bold text-base leading-tight line-clamp-2"
+                      style={{ textShadow: "0 1px 6px rgba(0,0,0,0.9)" }}
+                    >
+                      {proof.goal_text}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="font-[family-name:var(--font-mono)] text-[12px] tracking-widest font-semibold" style={{ color: accentHex }}>
+                        {WORK_TYPE_ICONS[proof.proof_type] ?? "·"} {proof.proof_type?.toUpperCase()}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map((i) => (
+                            <span
+                              key={i}
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: i < endorsementCount ? accentHex : "rgba(255,255,255,0.25)" }}
+                            />
+                          ))}
+                        </div>
+                        <span className="font-[family-name:var(--font-mono)] text-[12px] text-white font-semibold">
+                          {isFeatured ? "⬡" : isValidated ? "✓" : `${endorsementCount}/3`}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="absolute top-2 right-2 z-10">
-                    {endorsementCount >= 6 ? (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-sm bg-[#c9a84c]/15 text-[#c9a84c] border border-[#c9a84c]/30">Featured</span>
-                    ) : endorsementCount >= 3 ? (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-sm bg-[#c9a84c]/10 text-[#c9a84c] border border-[#c9a84c]/20">Validated</span>
-                    ) : (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-sm bg-white/5 text-slate-500 border border-white/10">Pending {endorsementCount}/3</span>
-                    )}
+                  {/* Edit / delete */}
+                  <div className="absolute top-1.5 left-1.5 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openEditModal(proof); }}
+                      className="bg-black/80 p-1 text-white/60 hover:text-white text-[10px]"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteProof(proof.id); }}
+                      className={`p-1 text-[10px] ${
+                        deletingId === proof.id ? "bg-red-500/80 text-white" : "bg-black/80 text-red-400/50 hover:text-red-400"
+                      }`}
+                      title={deletingId === proof.id ? "Click again to confirm" : "Delete"}
+                    >
+                      {deletingId === proof.id ? "?" : "✕"}
+                    </button>
                   </div>
                 </div>
               );
@@ -461,7 +492,7 @@ export function WorkTab({
               )}
               <div className="p-6 flex flex-col gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="font-[family-name:var(--font-mono)] text-[10px] px-2 py-0.5 rounded-sm border border-white/10 text-slate-400">
+                  <span className="font-[family-name:var(--font-mono)] text-[10px] px-2 py-0.5 rounded-sm border border-white/10 text-white/55">
                     {selectedWork.proof_type}
                   </span>
                   {selectedWork.edited && (selectedWork.endorsement_count ?? 0) >= 3 && (
@@ -469,7 +500,7 @@ export function WorkTab({
                       Edited
                     </span>
                   )}
-                  <span className="font-[family-name:var(--font-mono)] text-[10px] text-slate-600">
+                  <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/30">
                     {new Date(selectedWork.completed_at ?? selectedWork.created_at).toLocaleDateString("en-US", {
                       month: "short", day: "numeric", year: "numeric",
                     })}
@@ -485,7 +516,7 @@ export function WorkTab({
                   </button>
                 )}
                 {selectedWork.description && (
-                  <p className="text-slate-400 text-sm leading-relaxed">{selectedWork.description}</p>
+                  <p className="text-white/55 text-sm leading-relaxed">{selectedWork.description}</p>
                 )}
                 {selectedWork.proof_value && (
                   <a
@@ -498,7 +529,7 @@ export function WorkTab({
                   </a>
                 )}
                 <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                  <span className="font-[family-name:var(--font-mono)] text-xs text-slate-500">{endorsementCount} endorsements</span>
+                  <span className="font-[family-name:var(--font-mono)] text-xs text-white/40">{endorsementCount} endorsements</span>
                   <span
                     className="font-[family-name:var(--font-mono)] text-xs"
                     style={{ color: endorsementCount >= 3 ? "#c9a84c" : "#64748b" }}
@@ -506,12 +537,12 @@ export function WorkTab({
                     {endorsementCount >= 6 ? "⬡ Featured" : endorsementCount >= 3 ? "✓ Validated" : `${3 - endorsementCount} more needed`}
                   </span>
                 </div>
-                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-600">
+                <p className="font-[family-name:var(--font-mono)] text-xs text-white/30">
                   Worth {WORK_PROOF_POINTS[selectedWork.proof_type] ?? 3} pts · {endorsementCount >= 3 ? "Full value" : "Half value until validated"}
                 </p>
                 <button
                   onClick={() => { setSelectedWork(null); setShowOriginal(false); }}
-                  className="mt-2 font-[family-name:var(--font-mono)] text-xs text-slate-500 hover:text-white text-center transition-colors"
+                  className="mt-2 font-[family-name:var(--font-mono)] text-xs text-white/40 hover:text-white text-center transition-colors"
                 >
                   Close
                 </button>
@@ -540,11 +571,11 @@ export function WorkTab({
             <div className="p-5 flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono text-amber-400/60 tracking-widest">ORIGINAL SUBMISSION</span>
-                <button onClick={() => setShowOriginal(false)} className="text-slate-500 hover:text-white transition-colors">×</button>
+                <button onClick={() => setShowOriginal(false)} className="text-white/40 hover:text-white transition-colors">×</button>
               </div>
               <h3 className="text-white font-bold text-base">{selectedWork.original_goal_text || selectedWork.goal_text}</h3>
               {selectedWork.original_description && (
-                <p className="text-slate-400 text-sm leading-relaxed">{selectedWork.original_description}</p>
+                <p className="text-white/55 text-sm leading-relaxed">{selectedWork.original_description}</p>
               )}
               <a
                 href={selectedWork.original_proof_value}
@@ -554,7 +585,7 @@ export function WorkTab({
               >
                 {selectedWork.original_proof_value}
               </a>
-              <p className="text-[10px] text-slate-600 font-mono border-t border-white/5 pt-3">
+              <p className="text-[10px] text-white/30 font-mono border-t border-white/5 pt-3">
                 Submitted on {new Date(selectedWork.created_at).toLocaleDateString()} · Modified after endorsements
               </p>
             </div>
@@ -580,19 +611,19 @@ export function WorkTab({
             >
               <div className="p-6 flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <span className="font-[family-name:var(--font-mono)] text-xs text-slate-500 tracking-widest">EDIT PROOF</span>
-                  <button onClick={() => setEditProof(null)} className="text-slate-500 hover:text-white text-xl leading-none transition-colors">×</button>
+                  <span className="font-[family-name:var(--font-mono)] text-xs text-white/40 tracking-widest">EDIT PROOF</span>
+                  <button onClick={() => setEditProof(null)} className="text-white/40 hover:text-white text-xl leading-none transition-colors">×</button>
                 </div>
 
                 {isLocked ? (
                   <div className="text-center py-6">
-                    <p className="text-slate-400 text-sm font-mono">🔒 This proof is locked</p>
-                    <p className="text-slate-600 text-xs mt-2">Validated proofs are locked 7 days after submission.</p>
+                    <p className="text-white/55 text-sm font-mono">🔒 This proof is locked</p>
+                    <p className="text-white/30 text-xs mt-2">Validated proofs are locked 7 days after submission.</p>
                   </div>
                 ) : (
                   <>
                     <div>
-                      <label className="block font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-widest mb-2">Title</label>
+                      <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-2">Title</label>
                       <input
                         type="text"
                         value={editTitle}
@@ -603,8 +634,8 @@ export function WorkTab({
                     </div>
 
                     <div>
-                      <label className="block font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-widest mb-2">
-                        Link{endorsementCount > 0 && <span className="ml-2 text-slate-500 text-xs font-normal">(locked — has endorsements)</span>}
+                      <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-2">
+                        Link{endorsementCount > 0 && <span className="ml-2 text-white/40 text-xs font-normal">(locked — has endorsements)</span>}
                       </label>
                       <input
                         type="url"
@@ -619,7 +650,7 @@ export function WorkTab({
                     </div>
 
                     <div>
-                      <label className="block font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-widest mb-3">Type</label>
+                      <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-3">Type</label>
                       <div className="flex gap-2 flex-wrap">
                         {WORK_PROOF_TYPES.map((type) => (
                           <button
@@ -639,17 +670,17 @@ export function WorkTab({
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 text-sm font-medium mb-1.5">When did you build this?</label>
+                      <label className="block text-white/75 text-sm font-medium mb-1.5">When did you build this?</label>
                       <input
                         type="date"
                         value={editCompletedAt}
                         onChange={(e) => setEditCompletedAt(e.target.value)}
-                        className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-white/20 transition-colors"
+                        className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-white/85 outline-none focus:border-white/20 transition-colors"
                       />
                     </div>
 
                     <div>
-                      <label className="block font-[family-name:var(--font-mono)] text-[10px] text-slate-500 uppercase tracking-widest mb-2">Description</label>
+                      <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-2">Description</label>
                       <textarea
                         value={editDescription}
                         maxLength={280}
@@ -664,13 +695,13 @@ export function WorkTab({
                         <img src={editImageUrl} alt="Preview" className="w-full h-full object-cover opacity-70" />
                         <button
                           onClick={() => setEditImageUrl(null)}
-                          className="absolute top-2 right-2 text-slate-400 hover:text-white bg-black/60 rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
+                          className="absolute top-2 right-2 text-white/55 hover:text-white bg-black/60 rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
                         >
                           ×
                         </button>
                       </div>
                     ) : (
-                      <label className="flex items-center gap-2 cursor-pointer text-slate-300 text-sm hover:text-white transition-colors">
+                      <label className="flex items-center gap-2 cursor-pointer text-white/75 text-sm hover:text-white transition-colors">
                         <input
                           type="file"
                           accept="image/*"
@@ -690,7 +721,7 @@ export function WorkTab({
                     <div className="flex items-center justify-between pt-2">
                       <button
                         onClick={() => setEditProof(null)}
-                        className="font-[family-name:var(--font-mono)] text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                        className="font-[family-name:var(--font-mono)] text-xs text-white/40 hover:text-white/75 transition-colors"
                       >
                         Cancel
                       </button>
