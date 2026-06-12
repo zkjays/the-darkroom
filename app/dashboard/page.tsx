@@ -109,17 +109,6 @@ export default function Dashboard() {
   const [tourStep, setTourStep] = useState<number | null>(null);
   const { messages: toastMessages, showToast } = useToast();
 
-  const handleXPGained = useCallback(
-    (xp: { xp_added: number; points_gained: number; xp_cost: number; new_stat_xp: number }) => {
-      if (xp.points_gained > 0) {
-        showToast(`+${xp.xp_added} XP → +${xp.points_gained} point${xp.points_gained > 1 ? "s" : ""}!`);
-      } else {
-        showToast(`+${xp.xp_added} XP (${xp.new_stat_xp}/${xp.xp_cost} to next point)`);
-      }
-    },
-    [showToast]
-  );
-
   const fetchDashboard = useCallback((handle: string) => {
     fetch(`/api/dashboard?handle=${encodeURIComponent(handle)}`, { cache: "no-store" })
       .then((r) => r.json())
@@ -134,6 +123,19 @@ export default function Dashboard() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleXPGained = useCallback(
+    (xp: { xp_added: number; points_gained: number; xp_cost: number; new_stat_xp: number }) => {
+      if (xp.points_gained > 0) {
+        showToast(`+${xp.xp_added} XP → +${xp.points_gained} point${xp.points_gained > 1 ? "s" : ""}!`);
+      } else {
+        showToast(`+${xp.xp_added} XP (${xp.new_stat_xp}/${xp.xp_cost} to next point)`);
+      }
+      const handle = (session as { handle?: string } | null)?.handle;
+      if (handle) fetchDashboard(handle);
+    },
+    [showToast, session, fetchDashboard]
+  );
 
   useEffect(() => {
     if (authStatus === "loading") return;

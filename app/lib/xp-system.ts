@@ -72,3 +72,50 @@ export async function convertXPToPoints(
     new_total_xp: newTotalXp,
   };
 }
+
+/**
+ * Deduct XP when a work proof is deleted.
+ * Reverses convertXPToPoints: removes stat_xp, total_xp,
+ * and rolls back any bonus_points that were earned from this XP.
+ */
+export async function deductXP(
+  db: ReturnType<typeof getServiceSupabase>,
+  handle: string,
+  statKey: string,
+  xpToDeduct: number
+): Promise<void> {
+  const { data: row } = await db
+    .from("darkroom_ids")
+    .select("score, bonus_points, stats, stat_xp, total_xp")
+    .eq("handle", handle)
+    .single();
+
+  if (!row) return;
+
+  const statXp = (row.stat_xp ?? {}) as Record<string, number>;
+  const currentStatXp = statXp[statKey] ?? 0;
+  const bonusPoints = row.bonus_points ?? 0;
+  const xpCost = getXPCost((row.score ?? 0) + bonusPoints);
+
+  let newStatXp = currentStatXp - xpToDeduct;
+  let pointsToDeduct = 0;
+
+  if (newStatXp < 0) {
+    // XP was already converted to bonus_points — roll back
+    pointsToDeduct = Math.ceil(Math.abs(newStatXp) / xpCost);
+    newStatXp = pointsToDeduct * xpCost + newStatXp;
+  }
+
+  const updates: Record<string, unknown> = {
+    stat_xp: { ...statXp, [statKey]: Math.max(0, newStatXp) },
+    total_xp: Math.max(0, (row.total_xp ?? 0) - xpToDeduct),
+    bonus_points: Math.max(0, bonusPoints - pointsToDeduct),
+  };
+
+  if (pointsToDeduct > 0) {
+    const stats = (row.stats ?? {}) as Record<string, number>;
+    updates.stats = { ...stats, [statKey]: Math.max(0, (stats[statKey] ?? 0) - pointsToDeduct) };
+  }
+
+  await db.from("darkroom_ids").update(updates).eq("handle", handle);
+}

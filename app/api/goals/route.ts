@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
-import { convertXPToPoints } from "@/app/lib/xp-system";
+import { convertXPToPoints, deductXP } from "@/app/lib/xp-system";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth-options";
 import { sanitizeHandle } from "@/app/lib/sanitize";
@@ -181,12 +181,13 @@ export async function POST(req: NextRequest) {
 
   // If direct-complete (Work submission), run XP logic + update work_proof immediately
   if (isDirectComplete && goal) {
-    const xpResult = await convertXPToPoints(db, handle, target_stat, 1);
+    const xpToAdd = xp_reward ?? 5;
+    const xpResult = await convertXPToPoints(db, handle, target_stat, xpToAdd);
     try {
       await db.from("xp_earnings").insert({
         handle,
         source: "goal_complete",
-        amount: 1,
+        amount: xpToAdd,
         meta: { goal_id: goal.id, stat: target_stat, points_gained: xpResult.points_gained },
       });
     } catch (e) {
@@ -432,7 +433,7 @@ export async function DELETE(req: NextRequest) {
 
   const { data: goal, error: getError } = await db
     .from("daily_goals")
-    .select("handle, proof_value")
+    .select("handle, proof_value, xp_reward, target_stat")
     .eq("id", goal_id)
     .single();
 
@@ -444,6 +445,9 @@ export async function DELETE(req: NextRequest) {
 
   await db.from("goal_endorsements").delete().eq("goal_id", goal_id);
   await db.from("daily_goals").delete().eq("id", goal_id);
+
+  // Deduct XP earned from this proof
+  await deductXP(db, handle, goal.target_stat ?? "work_proof", goal.xp_reward ?? 5);
 
   // Recalculate work_proof after deletion
   const { data: allProofs } = await db

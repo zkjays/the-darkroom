@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, account, profile }) {
       if (account && profile) {
         const twitterProfile = profile as TwitterProfile;
-        token.handle = twitterProfile.screen_name || "";
+        token.handle = (twitterProfile.screen_name || "").toLowerCase();
         token.xId = twitterProfile.id_str || "";
         token.profileImage =
           twitterProfile.profile_image_url_https?.replace(

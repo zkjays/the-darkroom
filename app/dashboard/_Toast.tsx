@@ -7,15 +7,26 @@ export interface ToastMsg { id: number; text: string }
 export function Toast({ messages }: { messages: ToastMsg[] }) {
   if (messages.length === 0) return null;
   return (
-    <div className="fixed top-24 right-6 z-50 flex flex-col gap-2 pointer-events-none">
-      {messages.map((m) => (
-        <div
-          key={m.id}
-          className="bg-white/[0.08] border border-white/[0.12] backdrop-blur rounded-full px-4 py-2 font-[family-name:var(--font-mono)] text-xs text-slate-200 animate-fade-in-up"
-        >
-          {m.text}
-        </div>
-      ))}
+    <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+      <div className="flex flex-col items-center gap-4">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className="animate-xp-pop flex flex-col items-center gap-1 bg-black/75 border border-[#c9a84c]/50 backdrop-blur-sm rounded-2xl px-10 py-6 shadow-2xl"
+          >
+            <span className="font-[family-name:var(--font-mono)] text-4xl font-bold text-[#c9a84c] tracking-tight">
+              {m.text.split("(")[0].split("→")[0].trim()}
+            </span>
+            {(m.text.includes("→") || m.text.includes("(")) && (
+              <span className="font-[family-name:var(--font-mono)] text-sm text-white/60">
+                {m.text.includes("→")
+                  ? m.text.split("→")[1].trim()
+                  : m.text.match(/\(([^)]+)\)/)?.[1]}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
