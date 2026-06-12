@@ -5,6 +5,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth-options";
 import { sanitizeHandle } from "@/app/lib/sanitize";
 
+/*
+  ── REQUIRED MIGRATIONS (run once in Supabase SQL Editor) ────────────────────
+  ALTER TABLE darkroom_ids ADD COLUMN IF NOT EXISTS work_proof INTEGER DEFAULT 0;
+  ALTER TABLE darkroom_ids ADD COLUMN IF NOT EXISTS total_xp INTEGER DEFAULT 0;
+  ALTER TABLE darkroom_ids ADD COLUMN IF NOT EXISTS stat_xp JSONB DEFAULT '{"focus":0,"consistency":0,"reliability":0,"growth":0,"work_proof":0}';
+  ALTER TABLE daily_goals ADD COLUMN IF NOT EXISTS edited boolean DEFAULT false;
+  ─────────────────────────────────────────────────────────────────────────────
+*/
+
 const PROOF_POINTS: Record<string, number> = {
   // v2 categories
   Ship: 8, Code: 8, Publish: 5, Release: 5, Design: 5,
