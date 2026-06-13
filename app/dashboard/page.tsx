@@ -16,7 +16,7 @@ import { SITE_URL } from "./_types";
 import { SettingsPanel } from "./SettingsPanel";
 import { WorkTab } from "./WorkTab";
 import { ProofRing, getSocialAdvice, getBuilderAdvice } from "./StatsPanel";
-import OnboardingWidget from "../component/OnboardingWidget";
+import ChatWidget from "../component/ChatWidget";
 
 // ── Local helpers (small, used only in this file) ──────────────────────────
 function PfpPlaceholder({ handle, size }: { handle: string; size: number }) {
@@ -137,6 +137,11 @@ export default function Dashboard() {
     [showToast, session, fetchDashboard]
   );
 
+  const handleWorkProofRecalculated = useCallback(() => {
+    const handle = (session as { handle?: string } | null)?.handle;
+    if (handle) fetchDashboard(handle);
+  }, [session, fetchDashboard]);
+
   useEffect(() => {
     if (authStatus === "loading") return;
     if (authStatus === "unauthenticated") { router.replace("/login"); return; }
@@ -200,7 +205,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#050508] text-white font-[family-name:var(--font-outfit)]">
       <Toast messages={toastMessages} />
       <Navbar />
-      <OnboardingWidget
+      <ChatWidget
         handle={data.handle}
         accent={accent}
         profilePublic={profilePublic}
@@ -433,6 +438,7 @@ export default function Dashboard() {
               accentClass={accentCls}
               accent={accent}
               onXPGained={handleXPGained}
+              onRecalculated={handleWorkProofRecalculated}
             />
           </div>
         )}

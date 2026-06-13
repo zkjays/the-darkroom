@@ -17,13 +17,14 @@ export const WORK_TYPE_ICONS: Record<string, string> = {
 };
 
 export function WorkTab({
-  handle, goalsPublic, accentClass: _accentClass, accent, onXPGained,
+  handle, goalsPublic, accentClass: _accentClass, accent, onXPGained, onRecalculated,
 }: {
   handle: string;
   goalsPublic: boolean;
   accentClass: string;
   accent: string;
   onXPGained: (xp: XpResult) => void;
+  onRecalculated?: () => void;
 }) {
   const accentHex = ACCENT_HEX[accent] ?? "#c9a84c";
   const [formOpen, setFormOpen] = useState(false);
@@ -51,14 +52,19 @@ export function WorkTab({
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Recalculate work_proof on mount to sync any proofs submitted before the V2 fix
-    fetch("/api/goals", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recalculate: true }) }).catch(() => {});
+    fetch("/api/goals", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recalculate: true }) })
+      .then((r) => r.json())
+      .then((d) => {
+        console.log("[WorkTab] recalculate response:", d);
+        if (d.work_proof !== undefined) onRecalculated?.();
+      })
+      .catch((e) => console.error("[WorkTab] recalculate error:", e));
     fetch(`/api/goals?handle=${encodeURIComponent(handle)}&all=true&completed=true`)
       .then((r) => r.json())
       .then((d) => setWorks(d.goals ?? []))
       .catch(() => {})
       .finally(() => setLoadingWorks(false));
-  }, [handle]);
+  }, [handle, onRecalculated]);
 
   const resetForm = () => {
     setFormOpen(false);
