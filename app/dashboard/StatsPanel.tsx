@@ -99,13 +99,12 @@ export function ProofCard({
 
 // ── ProofRing ───────────────────────────────────────────────────────────────
 export function ProofRing({
-  value, color, label, sublabel, onClick, hint,
+  value, color, label, sublabel, onClick, hint, size = 160,
 }: {
   value: number; color: string; label: string; sublabel: string;
-  onClick?: () => void; hint?: string; hoverGlow?: string;
+  onClick?: () => void; hint?: string; hoverGlow?: string; size?: number;
 }) {
-  const size = 160;
-  const strokeWidth = 8;
+  const strokeWidth = size < 110 ? 5 : 8;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (value / 100) * circumference;
@@ -129,12 +128,12 @@ export function ProofRing({
             style={{ transition: "stroke-dashoffset 700ms ease-out" }} />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-3xl font-bold text-white">{value}</span>
+          <span className="font-bold text-white" style={{ fontSize: size * 0.3 }}>{value}</span>
         </div>
       </div>
       <div className="text-center">
-        <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] text-white/60 uppercase">{label}</p>
-        <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 tracking-[0.15em] uppercase">{sublabel}</p>
+        <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.2em] text-white/60 uppercase">{label}</p>
+        <p className="font-[family-name:var(--font-mono)] text-[8px] text-slate-500 tracking-[0.15em] uppercase">{sublabel}</p>
         {hint && (
           <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-600 mt-1">{hint}</p>
         )}

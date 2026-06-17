@@ -32,6 +32,11 @@ export interface DashboardData {
   goals_public?: boolean;
   theme_accent?: string;
   open_to_opportunities?: boolean;
+  is_og?: boolean;
+  bio?: string;
+  link_x?: string;
+  link_github?: string;
+  link_site?: string;
 }
 
 export interface WorkProof {

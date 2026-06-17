@@ -9,41 +9,15 @@ import { getAccent } from "../lib/theme";
 
 // Dashboard sub-modules
 import { Toast, useToast } from "./_Toast";
-import { getCardStyle, getButtonStyle, ACCENT_HEX, TABS, formatDate, daysUntilReclaim, copyToClipboard } from "./_styles";
+import { getCardStyle, TABS, daysUntilReclaim, copyToClipboard } from "./_styles";
 import type { TabId } from "./_styles";
-import type { DashboardData } from "./_types";
+import type { DashboardData, WorkProof } from "./_types";
 import { SITE_URL } from "./_types";
+import { ProfileView } from "../component/profile/ProfileView";
 import { SettingsPanel } from "./SettingsPanel";
 import { WorkTab } from "./WorkTab";
-import { ProofRing, getSocialAdvice, getBuilderAdvice } from "./StatsPanel";
+import { getSocialAdvice, getBuilderAdvice } from "./StatsPanel";
 import ChatWidget from "../component/ChatWidget";
-
-// ── Local helpers (small, used only in this file) ──────────────────────────
-function PfpPlaceholder({ handle, size }: { handle: string; size: number }) {
-  return (
-    <div
-      className="rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0"
-      style={{ width: size, height: size }}
-    >
-      <span className="text-white/75 font-bold" style={{ fontSize: size * 0.38 }}>
-        {handle.charAt(0).toUpperCase()}
-      </span>
-    </div>
-  );
-}
-
-function ProfileImage({ url, handle, size }: { url?: string; handle: string; size: number }) {
-  const [failed, setFailed] = useState(false);
-  if (!url || failed) return <PfpPlaceholder handle={handle} size={size} />;
-  return (
-    <img
-      src={url} alt={handle} width={size} height={size}
-      onError={() => setFailed(true)}
-      className="rounded-full border border-white/10 object-cover flex-shrink-0"
-      style={{ width: size, height: size }}
-    />
-  );
-}
 
 // ── Tour steps ─────────────────────────────────────────────────────────────
 const TOUR_STEPS = [
@@ -107,6 +81,8 @@ export default function Dashboard() {
   const [openToOpportunities, setOpenToOpportunities] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [tourStep, setTourStep] = useState<number | null>(null);
+  const [profileProofs, setProfileProofs] = useState<WorkProof[]>([]);
+  const [referralCount, setReferralCount] = useState(0);
   const { messages: toastMessages, showToast } = useToast();
 
   const fetchDashboard = useCallback((handle: string) => {
@@ -163,6 +139,20 @@ export default function Dashboard() {
     return () => window.removeEventListener("darkroom:switchTab", handler);
   }, []);
 
+  // Proofs + referral count for the ID/profile view (WYSIWYG with /p/[handle])
+  const profileHandle = data?.handle;
+  useEffect(() => {
+    if (!profileHandle) return;
+    fetch(`/api/goals?handle=${encodeURIComponent(profileHandle)}&all=true&completed=true`)
+      .then((r) => r.json())
+      .then((d) => setProfileProofs(d.goals ?? []))
+      .catch(() => {});
+    fetch(`/api/referrals?handle=${encodeURIComponent(profileHandle)}`)
+      .then((r) => r.json())
+      .then((d) => setReferralCount(d.count ?? 0))
+      .catch(() => {});
+  }, [profileHandle]);
+
   // ── Loading / error states ──
   if (authStatus === "loading" || loading) {
     return (
@@ -191,14 +181,10 @@ export default function Dashboard() {
 
   if (!data) return null;
 
-  const bonusPoints = data.bonus_points ?? 0;
-  const totalScore = data.total_score ?? data.score + bonusPoints;
   const accentCls = getAccent(accent).primary;
   const cs = getCardStyle(accent);
   const daysLeft = daysUntilReclaim(data.updated_at);
   const canReclaim = daysLeft <= 0;
-  const streak = data.streak;
-  const claimDate = formatDate(data);
   const profileLink = `${SITE_URL}/p/${data.handle}`;
 
   return (
@@ -256,176 +242,48 @@ export default function Dashboard() {
 
         {/* ── TAB 1: ID ── */}
         {activeTab === "id" && (
-          <div className="mx-auto max-w-4xl px-6 py-8 space-y-8">
-
-            {/* Top row: score left + PFP right */}
-            <div className="flex items-start justify-between gap-6">
-              <div className={`${cs.scoreCard} rounded-xl p-5 flex flex-col gap-1 flex-1`}>
-                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase`}>
-                  Room Score
-                </p>
-                <div className="font-[family-name:var(--font-mono)] text-[64px] lg:text-[80px] font-bold leading-none text-white">
-                  {totalScore}
+          <div className="mx-auto max-w-3xl px-6 py-8">
+            <ProfileView
+              data={data}
+              proofs={profileProofs}
+              owner
+              accent={accent}
+              referralCount={referralCount}
+              currentHandle={data.handle}
+              isPublic={profilePublic}
+              onMakePublic={async () => {
+                const res = await fetch("/api/settings", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ handle: data.handle, profile_public: true }),
+                });
+                const d = await res.json();
+                if (d.success) setProfilePublic(true);
+              }}
+              onRingClick={(type, value, color) => setProofModal({ type, value, color })}
+              analysisOpen={analysisOpen}
+              onToggleAnalysis={() => setAnalysisOpen((v) => !v)}
+              canReclaim={canReclaim}
+              onReanalyze={() => { window.location.href = "/darkroom-id?reanalyze=1"; }}
+              cardSlot={
+                <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
+                  <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Your Card</p>
+                  <CardGenerator
+                    handle={data.handle}
+                    score={data.score}
+                    archetype={data.archetype}
+                    tagline={data.tagline}
+                    analysis={data.analysis}
+                    darkroomLine={data.darkroom_line}
+                    profileImageUrl={data.profile_image_url}
+                    socialProof={data.social_proof ?? 0}
+                    builderProof={data.builder_proof ?? 0}
+                    workProof={data.work_proof ?? 0}
+                    onShare={handleShare}
+                  />
                 </div>
-                {bonusPoints > 0 ? (
-                  <p className="font-[family-name:var(--font-mono)] text-xs text-white/55">
-                    Base {data.score} + {bonusPoints} bonus
-                  </p>
-                ) : (
-                  <p className="font-[family-name:var(--font-mono)] text-xs text-white/40">
-                    Base score · earn up to +25 from certs
-                  </p>
-                )}
-                <div className="mt-2 text-base font-extrabold tracking-tight text-white">{data.archetype}</div>
-                <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] text-white/45 uppercase">{data.tagline}</p>
-                {streak && streak.current_streak > 0 && (
-                  <span className="mt-2 self-start bg-white/[0.05] border border-white/[0.08] text-white/75 text-xs px-2.5 py-1 rounded-full">
-                    🔥 {streak.current_streak} day streak
-                  </span>
-                )}
-              </div>
-
-              {/* PFP with hover score overlay */}
-              <div className="group relative flex flex-col items-center gap-1.5 flex-shrink-0 pt-1">
-                <div className="relative">
-                  <ProfileImage url={data.profile_image_url} handle={data.handle} size={72} />
-                  <div className="absolute inset-0 rounded-full bg-black/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <span className={`font-[family-name:var(--font-mono)] text-xl font-bold ${accentCls}`}>{totalScore}</span>
-                    <span className="font-[family-name:var(--font-mono)] text-[9px] text-white/55">/100</span>
-                  </div>
-                </div>
-                <span className="text-sm font-medium text-white">@{data.handle}</span>
-                <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/40">{data.archetype}</span>
-                <span className="font-[family-name:var(--font-mono)] text-[9px] text-white/35">hover to see score</span>
-              </div>
-            </div>
-
-            {/* Proof rings */}
-            <div className="flex flex-col items-center gap-6 py-4">
-              <div className="flex justify-center gap-10">
-                <ProofRing
-                  value={data.social_proof ?? 0}
-                  color="rgba(255,255,255,0.75)"
-                  label="Social"
-                  sublabel="Proof"
-                  hint="tap for insights"
-                  onClick={() => setProofModal({ type: "social", value: data.social_proof ?? 0, color: "rgba(255,255,255,0.75)" })}
-                />
-                <ProofRing
-                  value={data.builder_proof ?? 0}
-                  color="rgba(255,255,255,0.75)"
-                  label="Builder"
-                  sublabel="Proof"
-                  hint="tap for insights"
-                  onClick={() => setProofModal({ type: "builder", value: data.builder_proof ?? 0, color: "rgba(255,255,255,0.75)" })}
-                />
-              </div>
-
-              {/* Work Proof ring — smaller, centered below */}
-              {(() => {
-                const wp = data.work_proof ?? 0;
-                const size = 120;
-                const strokeWidth = 6;
-                const radius = (size - strokeWidth) / 2;
-                const circumference = 2 * Math.PI * radius;
-                const offset = circumference - (wp / 100) * circumference;
-                return (
-                  <div className="group flex flex-col items-center gap-2">
-                    <div
-                      className="relative transition-all duration-300 group-hover:scale-105"
-                      style={{ width: size, height: size }}
-                    >
-                      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-                        <circle cx={size / 2} cy={size / 2} r={radius}
-                          fill="none" stroke="rgba(201,168,76,0.15)" strokeWidth={strokeWidth} />
-                        <circle cx={size / 2} cy={size / 2} r={radius}
-                          fill="none" stroke="#c9a84c" strokeWidth={strokeWidth}
-                          strokeLinecap="round"
-                          strokeDasharray={circumference}
-                          strokeDashoffset={offset}
-                          style={{ transition: "stroke-dashoffset 700ms ease-out" }} />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span
-                          className="text-2xl font-bold"
-                          style={{ color: "#c9a84c", opacity: wp === 0 ? 0.4 : 1 }}
-                        >
-                          {wp}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.2em] uppercase" style={{ color: "#c9a84c" }}>WORK</p>
-                      <p className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 tracking-[0.15em] uppercase">PROOF</p>
-                    </div>
-                    <button
-                      onClick={() => setActiveTab("work")}
-                      className="font-[family-name:var(--font-mono)] text-[10px] text-white/35 hover:text-white/55 cursor-pointer transition-colors"
-                    >
-                      Submit proofs in Work tab →
-                    </button>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Analysis collapsible */}
-            <div className={`${cs.primaryCard} rounded-xl p-5`}>
-              <div className="flex items-center justify-between">
-                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase`}>Analysis</p>
-                <button
-                  onClick={() => setAnalysisOpen((v) => !v)}
-                  className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 hover:text-white/75 transition-colors"
-                >
-                  {analysisOpen ? "Collapse ↑" : "Read analysis ↓"}
-                </button>
-              </div>
-              <div
-                style={{ maxHeight: analysisOpen ? "600px" : "0", overflow: "hidden", transition: "max-height 350ms ease" }}
-              >
-                <p className="text-sm text-slate-200 leading-7 mt-3">{data.analysis}</p>
-                <p className="font-[family-name:var(--font-mono)] text-xs tracking-[0.1em] text-white/75 italic mt-4">{data.darkroom_line}</p>
-              </div>
-            </div>
-
-            {/* 2-col: share card + journey */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-4">
-                <p className={`font-[family-name:var(--font-mono)] text-xs tracking-[0.25em] ${accentCls} uppercase mb-3`}>Your Card</p>
-                <CardGenerator
-                  handle={data.handle}
-                  score={data.score}
-                  archetype={data.archetype}
-                  tagline={data.tagline}
-                  analysis={data.analysis}
-                  darkroomLine={data.darkroom_line}
-                  profileImageUrl={data.profile_image_url}
-                  socialProof={data.social_proof ?? 0}
-                  builderProof={data.builder_proof ?? 0}
-                  workProof={data.work_proof ?? 0}
-                  onShare={handleShare}
-                />
-              </div>
-
-              {data.updated_at && (Date.now() - new Date(data.updated_at).getTime()) > 7 * 24 * 60 * 60 * 1000 && (
-                <button
-                  onClick={() => { window.location.href = "/darkroom-id?reanalyze=1"; }}
-                  className="w-full rounded-sm border border-white/[0.07] hover:border-white/20 bg-white/[0.02] hover:bg-white/[0.04] py-3 font-[family-name:var(--font-mono)] text-xs text-white/55 hover:text-white transition-all tracking-widest uppercase"
-                >
-                  ↻ Re-analyze my ID
-                </button>
-              )}
-            </div>
-
-            {/* Coming soon */}
-            <div className={`${cs.nestedCard} rounded-xl px-5 py-4 text-center`}>
-              <p className="font-[family-name:var(--font-mono)] text-xs text-white/55">
-                Lessons &amp; Certifications coming soon.
-              </p>
-              <p className="font-[family-name:var(--font-mono)] text-xs text-white/40 mt-1">
-                Your score has room to grow. Stay in The Darkroom.
-              </p>
-            </div>
+              }
+            />
           </div>
         )}
 
