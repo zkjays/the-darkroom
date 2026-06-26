@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Navbar from "../component/landing/Navbar";
+import { plugTier } from "../lib/plug";
 
 interface Builder {
   handle: string;
@@ -14,6 +15,22 @@ interface Builder {
   profile_image_url?: string;
   archetype: string;
   is_og?: boolean;
+}
+
+interface Proof {
+  id: string;
+  handle: string;
+  goal_text: string;
+  proof_type: string;
+  proof_value: string;
+  plugs: number;
+  weighted: number;
+  velocity: number;
+  tier: string;
+  tier_label: string;
+  top_pluggers: string[];
+  builder_pfp?: string;
+  builder_og?: boolean;
 }
 
 function PfpPlaceholder({ handle, size }: { handle: string; size: number }) {
@@ -133,12 +150,106 @@ function BuilderRow({
   );
 }
 
+// The signature glyph — a single light point whose brightness encodes the plug tier.
+function PlugDot({ plugs }: { plugs: number }) {
+  const t = plugTier(plugs);
+  const lit = t.glow > 0;
+  const size = 11;
+  return (
+    <span className="relative inline-flex items-center justify-center flex-shrink-0" style={{ width: 18, height: 18 }}>
+      {t.halo && (
+        <span
+          className="absolute inset-0 rounded-full animate-pulse"
+          style={{ boxShadow: `0 0 14px 3px ${t.color}`, opacity: 0.45 }}
+        />
+      )}
+      <span
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 9999,
+          background: lit ? t.color : "transparent",
+          border: lit ? "none" : `1.5px solid ${t.color}`,
+          boxShadow: lit ? `0 0 ${4 + t.glow * 12}px ${t.color}` : "none",
+          opacity: lit ? Math.max(0.5, t.glow) : 1,
+        }}
+      />
+    </span>
+  );
+}
+
+function ProofRow({ p, rank, isMe }: { p: Proof; rank: number; isMe: boolean }) {
+  const isTop3 = rank <= 3;
+  const rankColors = ["#c9a84c", "rgba(255,255,255,0.6)", "rgba(201,168,76,0.5)"];
+  const rankColor = rank <= 3 ? rankColors[rank - 1] : "rgba(255,255,255,0.2)";
+  const t = plugTier(p.plugs);
+
+  return (
+    <a
+      href={`/p/${p.handle}`}
+      className={`flex items-center gap-4 px-4 py-3.5 rounded-sm border transition-all ${
+        isMe
+          ? "border-[#c9a84c]/40 bg-[#c9a84c]/[0.04] hover:bg-[#c9a84c]/[0.07]"
+          : isTop3
+          ? "border-white/[0.10] bg-[#0c0c14] hover:border-white/25 hover:bg-[#0f0f18]"
+          : "border-white/[0.05] bg-[#0c0c14] hover:border-white/15 hover:bg-[#0f0f18]"
+      }`}
+    >
+      {/* Rank */}
+      <span
+        className="font-[family-name:var(--font-mono)] text-sm font-bold w-8 text-center flex-shrink-0"
+        style={{ color: rankColor }}
+      >
+        #{rank}
+      </span>
+
+      {/* Plug glyph */}
+      <PlugDot plugs={p.plugs} />
+
+      {/* Avatar */}
+      <ProfileImage url={p.builder_pfp} handle={p.handle} size={32} />
+
+      {/* Proof + builder */}
+      <div className="flex flex-col gap-1 flex-1 min-w-0">
+        <span className="text-sm font-medium text-white truncate">{p.goal_text}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`font-[family-name:var(--font-mono)] text-[10px] truncate ${isMe ? "text-[#c9a84c]" : "text-slate-500"}`}>
+            @{p.handle}
+          </span>
+          <span className="font-[family-name:var(--font-mono)] text-[9px] px-1.5 py-0.5 rounded-sm border border-white/10 text-slate-500 uppercase tracking-wider flex-shrink-0">
+            {p.proof_type}
+          </span>
+          <span className="font-[family-name:var(--font-mono)] text-[9px] uppercase tracking-wider flex-shrink-0" style={{ color: t.color, opacity: 0.8 }}>
+            {p.tier_label}
+          </span>
+        </div>
+      </div>
+
+      {/* Plug count */}
+      <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+        <span className="font-bold text-xl leading-none" style={{ color: t.glow > 0 ? t.color : "rgba(255,255,255,0.5)" }}>
+          {p.plugs}
+        </span>
+        <span className="text-[9px] font-[family-name:var(--font-mono)] text-slate-600 tracking-widest">
+          PLUG{p.plugs !== 1 ? "S" : ""}
+        </span>
+      </div>
+    </a>
+  );
+}
+
 export default function Leaderboard() {
   const { data: session, status } = useSession();
+  const [view, setView] = useState<"builders" | "proofs">("builders");
   const [builders, setBuilders] = useState<Builder[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasProof, setHasProof] = useState(false);
   const [checkingProof, setCheckingProof] = useState(true);
+
+  const [proofs, setProofs] = useState<Proof[]>([]);
+  const [proofTypes, setProofTypes] = useState<string[]>([]);
+  const [proofFilter, setProofFilter] = useState("all");
+  const [loadingProofs, setLoadingProofs] = useState(false);
 
   const myHandle = (session as { handle?: string } | null)?.handle;
 
@@ -159,6 +270,18 @@ export default function Leaderboard() {
       .finally(() => setLoading(false));
   }, [hasProof]);
 
+  useEffect(() => {
+    if (!hasProof || view !== "proofs") return;
+    setLoadingProofs(true);
+    fetch(`/api/leaderboard/proofs?filter=${encodeURIComponent(proofFilter)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setProofs(d.proofs ?? []);
+        if ((d.types ?? []).length) setProofTypes(d.types);
+      })
+      .finally(() => setLoadingProofs(false));
+  }, [hasProof, view, proofFilter]);
+
   const myRank = myHandle ? builders.findIndex((b) => b.handle === myHandle) : -1;
   const myBuilder = myRank >= 0 ? builders[myRank] : null;
 
@@ -175,7 +298,7 @@ export default function Leaderboard() {
           </p>
           <h1 className="text-3xl font-bold text-white tracking-tight">Room Score</h1>
           <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 mt-2">
-            builders ranked by proof — not promises
+            {view === "builders" ? "builders ranked by proof — not promises" : "proofs ranked by plugs — the room decides"}
           </p>
           <div className="mt-4 h-[1px] w-12" style={{ background: "linear-gradient(90deg, rgba(201,168,76,0.6), transparent)" }} />
         </div>
@@ -206,61 +329,102 @@ export default function Leaderboard() {
             </Link>
           </div>
 
-        ) : loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-6 h-6 rounded-full border-2 border-white/15 border-t-white/50 animate-spin" />
-          </div>
-
-        ) : builders.length === 0 ? (
-          <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 text-center py-20">No builders yet.</p>
-
         ) : (
-          <div className="flex flex-col gap-1.5">
+          <>
+            {/* View toggle — Builders ↔ Proofs */}
+            <div className="flex items-center gap-1 mb-6 p-1 rounded-sm border border-white/[0.06] bg-[#0c0c14] w-fit">
+              {(["builders", "proofs"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={`px-4 py-1.5 rounded-sm font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-widest transition-all ${
+                    view === v ? "bg-white/[0.06] text-white" : "text-slate-500 hover:text-white/70"
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
 
-            {/* Top 3 — slightly more prominent */}
-            {builders.slice(0, 3).map((b, i) => (
-              <BuilderRow
-                key={b.handle}
-                b={b}
-                rank={i + 1}
-                isMe={b.handle === myHandle}
-              />
-            ))}
+            {view === "builders" ? (
+              loading ? (
+                <div className="flex justify-center py-20">
+                  <div className="w-6 h-6 rounded-full border-2 border-white/15 border-t-white/50 animate-spin" />
+                </div>
+              ) : builders.length === 0 ? (
+                <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 text-center py-20">No builders yet.</p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
 
-            {/* Separator */}
-            {builders.length > 3 && (
-              <div className="my-2 h-[1px] bg-white/[0.04]" />
+                  {/* Top 3 — slightly more prominent */}
+                  {builders.slice(0, 3).map((b, i) => (
+                    <BuilderRow key={b.handle} b={b} rank={i + 1} isMe={b.handle === myHandle} />
+                  ))}
+
+                  {/* Separator */}
+                  {builders.length > 3 && <div className="my-2 h-[1px] bg-white/[0.04]" />}
+
+                  {/* Rest of list */}
+                  {builders.slice(3).map((b, i) => (
+                    <BuilderRow key={b.handle} b={b} rank={i + 4} isMe={b.handle === myHandle} />
+                  ))}
+
+                  {/* Your rank — shown separately only if not already visible in list */}
+                  {myBuilder && myRank >= 0 && (
+                    <div className="mt-6 pt-5 border-t border-white/[0.06]">
+                      <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-600 uppercase tracking-widest mb-2">
+                        your position
+                      </p>
+                      <BuilderRow b={myBuilder} rank={myRank + 1} isMe={true} />
+                    </div>
+                  )}
+
+                  {/* Footer count */}
+                  <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-700 text-center mt-6">
+                    {builders.length} builder{builders.length !== 1 ? "s" : ""} · proof-verified
+                  </p>
+                </div>
+              )
+            ) : (
+              <>
+                {/* Filter chips */}
+                <div className="flex flex-wrap items-center gap-1.5 mb-5">
+                  {["all", "rising", ...proofTypes].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setProofFilter(f)}
+                      className={`px-3 py-1 rounded-sm border font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-wider transition-all ${
+                        proofFilter === f
+                          ? "border-[#c9a84c]/40 text-[#c9a84c] bg-[#c9a84c]/[0.06]"
+                          : "border-white/[0.06] text-slate-500 hover:text-white/70 hover:border-white/15"
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+
+                {loadingProofs ? (
+                  <div className="flex justify-center py-20">
+                    <div className="w-6 h-6 rounded-full border-2 border-white/15 border-t-white/50 animate-spin" />
+                  </div>
+                ) : proofs.length === 0 ? (
+                  <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 text-center py-20">
+                    {proofFilter === "rising" ? "Nothing rising yet — plug an early build." : "No proofs yet."}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {proofs.map((p, i) => (
+                      <ProofRow key={p.id} p={p} rank={i + 1} isMe={p.handle === myHandle} />
+                    ))}
+                    <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-700 text-center mt-6">
+                      {proofs.length} proof{proofs.length !== 1 ? "s" : ""} · plug-ranked
+                    </p>
+                  </div>
+                )}
+              </>
             )}
-
-            {/* Rest of list */}
-            {builders.slice(3).map((b, i) => (
-              <BuilderRow
-                key={b.handle}
-                b={b}
-                rank={i + 4}
-                isMe={b.handle === myHandle}
-              />
-            ))}
-
-            {/* Your rank — shown separately only if not already visible in list */}
-            {myBuilder && myRank >= 0 && (
-              <div className="mt-6 pt-5 border-t border-white/[0.06]">
-                <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-600 uppercase tracking-widest mb-2">
-                  your position
-                </p>
-                <BuilderRow
-                  b={myBuilder}
-                  rank={myRank + 1}
-                  isMe={true}
-                />
-              </div>
-            )}
-
-            {/* Footer count */}
-            <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-700 text-center mt-6">
-              {builders.length} builder{builders.length !== 1 ? "s" : ""} · proof-verified
-            </p>
-          </div>
+          </>
         )}
       </main>
     </div>

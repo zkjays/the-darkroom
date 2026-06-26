@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
       work_proof: dbWorkProof,
       analysis,
       darkroom_line,
-      profile_image_url: profile_image_url ?? null,
+      profile_image_url: profile_image_url ?? session.profileImage ?? null,
       claim_count: 1,
       auth_token: authToken,
     });
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
       work_proof: dbWorkProof,
       analysis,
       darkroom_line,
-      profile_image_url: profile_image_url ?? null,
+      profile_image_url: profile_image_url ?? existing.profile_image_url ?? session.profileImage ?? null,
       claim_count: newCount,
       updated_at: new Date().toISOString(),
       auth_token: authToken,
