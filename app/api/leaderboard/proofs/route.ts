@@ -56,12 +56,12 @@ export async function GET(req: NextRequest) {
   });
 
   // 4. Aggregate plugs per proof (raw count + weighted current + top pluggers)
-  const agg: Record<string, { count: number; weighted: number; pluggers: string[] }> = {};
+  const agg: Record<string, { count: number; weighted: number; pluggers: { handle: string; pfp?: string }[] }> = {};
   (plugs ?? []).forEach((p) => {
     const a = (agg[p.goal_id] ??= { count: 0, weighted: 0, pluggers: [] });
     a.count += 1;
     a.weighted += pluggerWeight(power[p.endorser_handle]);
-    if (a.pluggers.length < 3) a.pluggers.push(p.endorser_handle);
+    if (a.pluggers.length < 3) a.pluggers.push({ handle: p.endorser_handle, pfp: pfp[p.endorser_handle] });
   });
 
   const now = Date.now();

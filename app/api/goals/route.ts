@@ -519,6 +519,19 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Already endorsed" }, { status: 409 });
     }
 
+    // Daily plug quota — 3 plugs per day max
+    const today = new Date().toISOString().split("T")[0];
+    const { data: todayPlugs } = await db
+      .from("goal_endorsements")
+      .select("id")
+      .eq("endorser_handle", endorser_handle)
+      .eq("type", "endorse")
+      .gte("created_at", today + "T00:00:00.000Z");
+
+    if ((todayPlugs ?? []).length >= 3) {
+      return NextResponse.json({ error: "Daily plug limit reached" }, { status: 429 });
+    }
+
     // Insert dans goal_endorsements (source of truth)
     const { error: insertError } = await db
       .from("goal_endorsements")
