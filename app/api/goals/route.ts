@@ -4,6 +4,7 @@ import { convertXPToPoints, deductXP } from "@/app/lib/xp-system";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth-options";
 import { sanitizeHandle } from "@/app/lib/sanitize";
+import { WORK_PROOF_POINTS as PROOF_POINTS } from "@/app/dashboard/_work-constants";
 
 /*
   ── REQUIRED MIGRATIONS (run once in Supabase SQL Editor) ────────────────────
@@ -13,13 +14,6 @@ import { sanitizeHandle } from "@/app/lib/sanitize";
   ALTER TABLE daily_goals ADD COLUMN IF NOT EXISTS edited boolean DEFAULT false;
   ─────────────────────────────────────────────────────────────────────────────
 */
-
-const PROOF_POINTS: Record<string, number> = {
-  // v2 categories
-  Ship: 8, Code: 8, Publish: 5, Release: 5, Design: 5,
-  // legacy — keep for existing score recompute
-  Project: 8, OSS: 8, Article: 5, Video: 5, Thread: 3, Other: 3,
-};
 
 function today() {
   return new Date().toISOString().split("T")[0];

@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { ACCENT_HEX } from "./_styles";
-import { WORK_PROOF_TYPES, WORK_PROOF_POINTS } from "./_work-constants";
+import { BUILDER_PROOF_TYPES, SOCIAL_PROOF_TYPES, WORK_PROOF_POINTS, type ProofCategory } from "./_work-constants";
 import type { WorkProof, XpResult } from "./_types";
 
-const TOTAL_STEPS = 5;
-const STEP_LABELS = ["Link", "Title", "Cover", "Details", "Review"];
+const TOTAL_STEPS = 6;
+const STEP_LABELS = ["Category", "Link", "Title", "Cover", "Details", "Review"];
 
 // "Create post" style modal — step-by-step wizard.
 // Link-first: pasting the proof URL auto-fills title + cover (fetchOG),
@@ -26,6 +26,7 @@ export function SubmitWorkModal({
 }) {
   const accentHex = ACCENT_HEX[accent] ?? "#c9a84c";
   const [step, setStep] = useState(1);
+  const [category, setCategory] = useState<ProofCategory | null>(null);
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [proofType, setProofType] = useState("Ship");
@@ -80,16 +81,24 @@ export function SubmitWorkModal({
     }
   };
 
+  const selectCategory = (cat: ProofCategory) => {
+    setCategory(cat);
+    setProofType(cat === "social" ? "Post" : "Ship");
+  };
+
+  const typesForCategory = category === "social" ? SOCIAL_PROOF_TYPES : BUILDER_PROOF_TYPES;
+
   // Per-step gate for the Next button (optional steps always pass).
   const canAdvance =
-    step === 1 ? url.trim().length > 0 :
-    step === 2 ? title.trim().length > 0 :
+    step === 1 ? category !== null :
+    step === 2 ? url.trim().length > 0 :
+    step === 3 ? title.trim().length > 0 :
     true;
 
   const goNext = async () => {
     if (!canAdvance) return;
     // Leaving the link step → fetch the OG preview before showing title/cover.
-    if (step === 1 && !ogImage && !title) await fetchOG(url);
+    if (step === 2 && !ogImage && !title) await fetchOG(url);
     setStep((s) => Math.min(TOTAL_STEPS, s + 1));
   };
   const goBack = () => setStep((s) => Math.max(1, s - 1));
@@ -133,8 +142,43 @@ export function SubmitWorkModal({
             ))}
           </div>
 
-          {/* ── STEP 1 — Link (the proof) ── */}
+          {/* ── STEP 1 — Category ── */}
           {step === 1 && (
+            <div className="flex flex-col gap-3">
+              <label className={labelCls}>What are you proving?</label>
+              <div className="grid grid-cols-2 gap-3">
+                {(["builder", "social"] as const).map((cat) => {
+                  const isBuilder = cat === "builder";
+                  const selected = category === cat;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => selectCategory(cat)}
+                      className="flex flex-col items-start gap-2 p-4 rounded-sm border transition-all text-left"
+                      style={
+                        selected
+                          ? { borderColor: `${accentHex}50`, backgroundColor: `${accentHex}10` }
+                          : { borderColor: "rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.02)" }
+                      }
+                    >
+                      <span className="text-xl" style={{ color: selected ? accentHex : "rgba(255,255,255,0.25)" }}>
+                        {isBuilder ? "◆" : "◉"}
+                      </span>
+                      <span className="font-[family-name:var(--font-mono)] text-[11px] tracking-widest uppercase" style={{ color: selected ? accentHex : "rgba(255,255,255,0.55)" }}>
+                        {isBuilder ? "Builder" : "Social"}
+                      </span>
+                      <span className="font-[family-name:var(--font-mono)] text-[9px] text-white/30 leading-relaxed">
+                        {isBuilder ? "Projects, code, client work" : "Posts, articles, content"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP 2 — Link (the proof) ── */}
+          {step === 2 && (
             <div className="flex flex-col gap-3">
               <div>
                 <label className={labelCls}>Link to your proof</label>
@@ -155,15 +199,15 @@ export function SubmitWorkModal({
             </div>
           )}
 
-          {/* ── STEP 2 — Title + Type ── */}
-          {step === 2 && (
+          {/* ── STEP 3 — Title + Type ── */}
+          {step === 3 && (
             <div className="flex flex-col gap-6">
               <div>
                 <label className={labelCls}>Title</label>
                 <input
                   type="text"
                   autoFocus
-                  placeholder="What did you build?"
+                  placeholder={category === "social" ? "What did you publish?" : "What did you build?"}
                   value={title}
                   maxLength={60}
                   onChange={(e) => setTitle(e.target.value)}
@@ -174,7 +218,7 @@ export function SubmitWorkModal({
               <div>
                 <label className={labelCls}>Type</label>
                 <div className="flex gap-2 flex-wrap">
-                  {WORK_PROOF_TYPES.map((type) => (
+                  {typesForCategory.map((type) => (
                     <button
                       key={type}
                       onClick={() => setProofType(type)}
@@ -193,8 +237,8 @@ export function SubmitWorkModal({
             </div>
           )}
 
-          {/* ── STEP 3 — Cover ── */}
-          {step === 3 && (
+          {/* ── STEP 4 — Cover ── */}
+          {step === 4 && (
             <div>
               <label className={labelCls}>Cover image</label>
               {ogImage ? (
@@ -232,8 +276,8 @@ export function SubmitWorkModal({
             </div>
           )}
 
-          {/* ── STEP 4 — Details (description + date) ── */}
-          {step === 4 && (
+          {/* ── STEP 5 — Details (description + date) ── */}
+          {step === 5 && (
             <div className="flex flex-col gap-6">
               <div className="relative">
                 <label className={labelCls}>Description</label>
@@ -260,8 +304,8 @@ export function SubmitWorkModal({
             </div>
           )}
 
-          {/* ── STEP 5 — Review + Publish ── */}
-          {step === 5 && (
+          {/* ── STEP 6 — Review + Publish ── */}
+          {step === 6 && (
             <div className="flex flex-col gap-5">
               <div className="flex gap-4">
                 {ogImage ? (
@@ -313,7 +357,7 @@ export function SubmitWorkModal({
                     : { borderColor: "#c9a84c", color: "#0a0a0a", backgroundColor: "#c9a84c" }
                 }
               >
-                {ogLoading ? "Fetching…" : (step === 3 || step === 4) && canAdvance ? "Next / Skip →" : "Next →"}
+                {ogLoading ? "Fetching…" : (step === 4 || step === 5) && canAdvance ? "Next / Skip →" : "Next →"}
               </button>
             ) : (
               <button

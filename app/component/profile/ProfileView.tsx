@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { DashboardData, WorkProof } from "../../dashboard/_types";
 import { ACCENT_HEX } from "../../dashboard/_styles";
-import { WORK_PROOF_POINTS } from "../../dashboard/_work-constants";
+import { WORK_PROOF_POINTS, PROOF_CATEGORY_MAP } from "../../dashboard/_work-constants";
 import { ProofRing } from "../../dashboard/StatsPanel";
 import { ProofGrid } from "./ProofGrid";
 
@@ -298,14 +298,25 @@ export function ProfileView({
         </div>
 
         {/* ── Work gallery ── */}
-        <div className="mt-10">
-          <p className="font-[family-name:var(--font-mono)] text-xs text-white/40 tracking-[0.2em] uppercase mb-4">Work</p>
-          <ProofGrid
-            proofs={localProofs}
-            accentHex={accentHex}
-            onSelect={setSelectedProof}
-            emptyLabel={owner ? "No work yet — submit your first proof in the Work tab." : "No public work yet."}
-          />
+        <div className="mt-10 flex flex-col gap-8">
+          <div>
+            <p className="font-[family-name:var(--font-mono)] text-xs text-white/40 tracking-[0.2em] uppercase mb-4">◆ Builder Proof</p>
+            <ProofGrid
+              proofs={localProofs.filter((p) => (PROOF_CATEGORY_MAP[p.proof_type] ?? "builder") === "builder")}
+              accentHex={accentHex}
+              onSelect={setSelectedProof}
+              emptyLabel={owner ? "No builder proofs yet — submit your first in the Work tab." : "No builder proofs yet."}
+            />
+          </div>
+          <div>
+            <p className="font-[family-name:var(--font-mono)] text-xs text-white/40 tracking-[0.2em] uppercase mb-4">◉ Social Proof</p>
+            <ProofGrid
+              proofs={localProofs.filter((p) => PROOF_CATEGORY_MAP[p.proof_type] === "social")}
+              accentHex={accentHex}
+              onSelect={setSelectedProof}
+              emptyLabel={owner ? "No social proofs yet — submit a post or article." : "No social proofs yet."}
+            />
+          </div>
         </div>
 
         {/* ── Owner-only: shareable card + re-analyze (below proofs) ── */}

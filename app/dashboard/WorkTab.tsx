@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ACCENT_HEX } from "./_styles";
-import { WORK_PROOF_TYPES, WORK_PROOF_POINTS } from "./_work-constants";
+import { WORK_PROOF_POINTS, PROOF_CATEGORY_MAP, BUILDER_PROOF_TYPES, SOCIAL_PROOF_TYPES } from "./_work-constants";
 import type { WorkProof, XpResult } from "./_types";
 import { ProofGrid } from "../component/profile/ProofGrid";
 import { SubmitWorkModal } from "./SubmitWorkModal";
@@ -115,15 +115,32 @@ export function WorkTab({
           <div className="w-4 h-4 rounded-full border border-white/15 border-t-white/40 animate-spin" />
         </div>
       ) : (
-        <ProofGrid
-          proofs={works}
-          accentHex={accentHex}
-          onSelect={setSelectedWork}
-          onEdit={openEditModal}
-          onDelete={deleteProof}
-          deletingId={deletingId}
-          emptyLabel="No work submitted yet. Start building."
-        />
+        <div className="space-y-8">
+          <div>
+            <p className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 tracking-[0.2em] uppercase mb-4">◆ Builder Proof</p>
+            <ProofGrid
+              proofs={works.filter((w) => (PROOF_CATEGORY_MAP[w.proof_type] ?? "builder") === "builder")}
+              accentHex={accentHex}
+              onSelect={setSelectedWork}
+              onEdit={openEditModal}
+              onDelete={deleteProof}
+              deletingId={deletingId}
+              emptyLabel="No builder proofs yet."
+            />
+          </div>
+          <div>
+            <p className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 tracking-[0.2em] uppercase mb-4">◉ Social Proof</p>
+            <ProofGrid
+              proofs={works.filter((w) => PROOF_CATEGORY_MAP[w.proof_type] === "social")}
+              accentHex={accentHex}
+              onSelect={setSelectedWork}
+              onEdit={openEditModal}
+              onDelete={deleteProof}
+              deletingId={deletingId}
+              emptyLabel="No social proofs yet."
+            />
+          </div>
+        </div>
       )}
 
       {/* ── Submit modal ── */}
@@ -287,7 +304,7 @@ export function WorkTab({
                     <div>
                       <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-3">Type</label>
                       <div className="flex gap-2 flex-wrap">
-                        {WORK_PROOF_TYPES.map((type) => (
+                        {(PROOF_CATEGORY_MAP[editProof.proof_type] === "social" ? SOCIAL_PROOF_TYPES : BUILDER_PROOF_TYPES).map((type) => (
                           <button
                             key={type}
                             onClick={() => setEditProofType(type)}
