@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Step 4: Fetch last 50 tweets, keep original posts / self-threads only
-  let recentTweets: string[] = [];
+  let recentTweets: { id: string; text: string }[] = [];
   const tweetsController = new AbortController();
   const tweetsTimeout = setTimeout(() => tweetsController.abort(), 10000);
   try {
@@ -127,11 +127,11 @@ export async function POST(req: NextRequest) {
     clearTimeout(tweetsTimeout);
     if (tweetsRes.ok) {
       const tweetsData = await tweetsRes.json();
-      type TweetRaw = { text: string; in_reply_to_user_id?: string };
+      type TweetRaw = { id: string; text: string; in_reply_to_user_id?: string };
       // Keep original posts and self-threads; drop replies under other people's posts.
       recentTweets = (tweetsData.data ?? [])
         .filter((t: TweetRaw) => !t.in_reply_to_user_id || t.in_reply_to_user_id === userId)
-        .map((t: TweetRaw) => t.text.slice(0, 280));
+        .map((t: TweetRaw) => ({ id: t.id, text: t.text.slice(0, 280) }));
     } else {
       const body = await tweetsRes.text().catch(() => "");
       console.log("refresh: tweets fetch failed —", tweetsRes.status, body);
@@ -150,16 +150,17 @@ export async function POST(req: NextRequest) {
   // instead and flag it so the UI can say so honestly.
   const insufficientOriginalPosts = recentTweets.length === 0;
 
+  type AnalyzedPost = { id: string; text: string; url: string };
   let newSocialProof: number;
   let newBuilderProof: number;
-  let analyzedPosts: { social: string[]; builder: string[] } = { social: [], builder: [] };
+  let analyzedPosts: { social: AnalyzedPost[]; builder: AnalyzedPost[] } = { social: [], builder: [] };
 
   if (insufficientOriginalPosts) {
     newSocialProof = record.social_proof ?? 0;
     newBuilderProof = record.builder_proof ?? 0;
   } else {
     // Step 5: Call Claude
-    const tweetsText = recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\n");
+    const tweetsText = recentTweets.map((t, i) => `${i + 1}. ${t.text}`).join("\n");
 
     const claudeController = new AbortController();
     const claudeTimeout = setTimeout(() => claudeController.abort(), 15000);
@@ -216,11 +217,14 @@ Return ONLY:
       };
       newSocialProof = Math.min(100, Math.max(0, Math.round(parsed.social_proof)));
       newBuilderProof = Math.min(100, Math.max(0, Math.round(parsed.builder_proof)));
-      const toTexts = (indices: number[] | undefined) =>
-        (indices ?? []).map((i) => recentTweets[i - 1]).filter(Boolean);
+      const toPosts = (indices: number[] | undefined): AnalyzedPost[] =>
+        (indices ?? [])
+          .map((i) => recentTweets[i - 1])
+          .filter(Boolean)
+          .map((t) => ({ id: t.id, text: t.text, url: `https://x.com/${handle}/status/${t.id}` }));
       analyzedPosts = {
-        social: toTexts(parsed.social_indices),
-        builder: toTexts(parsed.builder_indices),
+        social: toPosts(parsed.social_indices),
+        builder: toPosts(parsed.builder_indices),
       };
     } catch (e) {
       clearTimeout(claudeTimeout);

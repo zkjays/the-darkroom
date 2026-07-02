@@ -490,7 +490,8 @@ export function ProfileView({
         const socialPosts = analyzedPosts.social ?? [];
         const builderPosts = analyzedPosts.builder ?? [];
 
-        const Row = ({ label, value, weight, result, posts }: { label: string; value: number; weight: string; result: number; posts?: string[] }) => (
+        type PostRef = string | { id: string; text: string; url: string };
+        const Row = ({ label, value, weight, result, posts }: { label: string; value: number; weight: string; result: number; posts?: PostRef[] }) => (
           <div className="border-b border-white/[0.04] last:border-0">
             <div className="flex items-center justify-between py-1.5">
               <span className="font-[family-name:var(--font-mono)] text-[10px] tracking-widest text-white/40">{label}</span>
@@ -501,11 +502,27 @@ export function ProfileView({
             </div>
             {posts && posts.length > 0 && (
               <div className="pb-2 space-y-1">
-                {posts.map((t, i) => (
-                  <p key={i} className="text-[10px] text-white/25 leading-relaxed pl-1 border-l border-white/10 truncate" title={t}>
-                    {t.length > 80 ? t.slice(0, 80) + "…" : t}
-                  </p>
-                ))}
+                {posts.map((p, i) => {
+                  const text = typeof p === "string" ? p : p.text;
+                  const url = typeof p === "string" ? undefined : p.url;
+                  const snippet = text.length > 80 ? text.slice(0, 80) + "…" : text;
+                  return url ? (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`${text} — view on X`}
+                      className="block text-[10px] text-white/25 hover:text-[#c9a84c] leading-relaxed pl-1 border-l border-white/10 hover:border-[#c9a84c]/40 truncate transition-colors"
+                    >
+                      {snippet}
+                    </a>
+                  ) : (
+                    <p key={i} className="text-[10px] text-white/25 leading-relaxed pl-1 border-l border-white/10 truncate" title={text}>
+                      {snippet}
+                    </p>
+                  );
+                })}
               </div>
             )}
           </div>
