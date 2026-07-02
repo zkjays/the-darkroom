@@ -111,32 +111,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "X user not found" }, { status: 404 });
   }
 
-  // Step 4: Fetch last 50 tweets, keep original posts / self-threads only
-  let recentTweets: { id: string; text: string }[] = [];
+  // Step 4: Paginate back through the timeline until we've collected enough original
+  // posts / self-threads. A single page of "recent activity" is mostly replies for
+  // some users — one page isn't enough to judge builder/social signal fairly.
+  type TweetRaw = { id: string; text: string; in_reply_to_user_id?: string };
+  const TARGET_ORIGINAL_TWEETS = 20;
+  const MAX_PAGES = 5;
+  const recentTweets: { id: string; text: string }[] = [];
+  let paginationToken: string | undefined;
   const tweetsController = new AbortController();
-  const tweetsTimeout = setTimeout(() => tweetsController.abort(), 10000);
+  const tweetsTimeout = setTimeout(() => tweetsController.abort(), 25000);
   try {
-    const tweetsRes = await fetch(
-      `https://api.x.com/2/users/${userId}/tweets?max_results=50&tweet.fields=text,public_metrics,in_reply_to_user_id&exclude=retweets`,
-      {
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const url = new URL(`https://api.x.com/2/users/${userId}/tweets`);
+      url.searchParams.set("max_results", "100");
+      url.searchParams.set("tweet.fields", "text,public_metrics,in_reply_to_user_id");
+      url.searchParams.set("exclude", "retweets");
+      if (paginationToken) url.searchParams.set("pagination_token", paginationToken);
+
+      const tweetsRes = await fetch(url, {
         headers: { Authorization: `Bearer ${bearerToken}` },
         next: { revalidate: 0 },
         signal: tweetsController.signal,
+      });
+      if (!tweetsRes.ok) {
+        const body = await tweetsRes.text().catch(() => "");
+        console.log("refresh: tweets fetch failed —", tweetsRes.status, body);
+        return NextResponse.json({ error: "Failed to fetch tweets" }, { status: 502 });
       }
-    );
-    clearTimeout(tweetsTimeout);
-    if (tweetsRes.ok) {
       const tweetsData = await tweetsRes.json();
-      type TweetRaw = { id: string; text: string; in_reply_to_user_id?: string };
-      // Keep original posts and self-threads; drop replies under other people's posts.
-      recentTweets = (tweetsData.data ?? [])
+      const original = (tweetsData.data ?? [])
         .filter((t: TweetRaw) => !t.in_reply_to_user_id || t.in_reply_to_user_id === userId)
         .map((t: TweetRaw) => ({ id: t.id, text: t.text.slice(0, 280) }));
-    } else {
-      const body = await tweetsRes.text().catch(() => "");
-      console.log("refresh: tweets fetch failed —", tweetsRes.status, body);
-      return NextResponse.json({ error: "Failed to fetch tweets" }, { status: 502 });
+      recentTweets.push(...original);
+
+      paginationToken = tweetsData.meta?.next_token;
+      if (!paginationToken || recentTweets.length >= TARGET_ORIGINAL_TWEETS) break;
     }
+    clearTimeout(tweetsTimeout);
   } catch (e) {
     clearTimeout(tweetsTimeout);
     const reason = e instanceof Error && e.name === "AbortError" ? "Tweets request timed out" : "X API request failed";
@@ -144,11 +156,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: reason }, { status: 502 });
   }
 
-  // If every recent tweet turned out to be a reply (dropped by the filter above), there is
-  // nothing original to score. Scoring against an empty prompt would let the AI guess/hallucinate
-  // a number, which silently corrupts the profile's score. Keep the existing scores untouched
-  // instead and flag it so the UI can say so honestly.
-  const insufficientOriginalPosts = recentTweets.length === 0;
+  // Even after paginating back up to 5 pages, too few original tweets means scoring
+  // would be statistically shaky (or, at zero, scoring against an empty prompt would
+  // let the AI guess/hallucinate a number). Keep the existing scores untouched instead
+  // and flag it so the UI can say so honestly rather than silently corrupting the score.
+  const MIN_ORIGINAL_TWEETS = 3;
+  const insufficientOriginalPosts = recentTweets.length < MIN_ORIGINAL_TWEETS;
 
   type AnalyzedPost = { id: string; text: string; url: string };
   let newSocialProof: number;

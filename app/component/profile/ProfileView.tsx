@@ -93,6 +93,7 @@ export function ProfileView({
   const [privateModalOpen, setPrivateModalOpen] = useState(false);
   const [makingPublic, setMakingPublic] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [expandedTweetDim, setExpandedTweetDim] = useState<"social" | "builder" | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshOverride, setRefreshOverride] = useState<Partial<DashboardData> | null>(null);
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
@@ -103,6 +104,9 @@ export function ProfileView({
   // without needing a full page reload to see the new numbers.
   const effective: DashboardData = refreshOverride ? { ...data, ...refreshOverride } : data;
   const totalScore = effective.total_score ?? (effective.score + (effective.bonus_points ?? 0));
+  const analyzedPosts = effective.analyzed_posts ?? {};
+  const socialPosts = analyzedPosts.social ?? [];
+  const builderPosts = analyzedPosts.builder ?? [];
 
   // `now` is ticked via effect (not read from Date.now() during render) so the cooldown
   // countdown stays a pure render while still updating live.
@@ -485,17 +489,17 @@ export function ProfileView({
         const sValidatedPts = sValidated.reduce((s, p) => s + calcPts(p), 0);
         const sPendingPts   = sPending.reduce((s, p) => s + calcPts(p), 0);
 
-        const analyzedPosts = effective.analyzed_posts ?? {};
-        const socialPosts = analyzedPosts.social ?? [];
-        const builderPosts = analyzedPosts.builder ?? [];
-
         type PostRef = string | { id: string; text: string; url: string };
-        const Row = ({ label, value, weight, result, posts }: { label: string; value: number; weight: string; result: number; posts?: PostRef[] }) => (
+        const Row = ({ label, value, weight, result, posts, dim }: { label: string; value: number; weight: string; result: number; posts?: PostRef[]; dim?: "social" | "builder" }) => (
           <div className="border-b border-white/[0.04] last:border-0">
             <div className="flex items-center justify-between py-1.5">
-              <span className="font-[family-name:var(--font-mono)] text-[10px] tracking-widest text-white/40">
-                {label}{posts && posts.length > 0 ? ` (${posts.length})` : ""}
-              </span>
+              <button
+                disabled={!posts || posts.length === 0}
+                onClick={() => dim && setExpandedTweetDim(dim)}
+                className="font-[family-name:var(--font-mono)] text-[10px] tracking-widest text-white/40 enabled:hover:text-[#c9a84c] transition-colors disabled:cursor-default"
+              >
+                {label}{posts && posts.length > 0 ? ` (${posts.length}) →` : ""}
+              </button>
               <div className="flex items-center gap-3 text-right">
                 <span className="text-white/55 text-xs">{value}<span className="text-white/25 text-[10px]"> × {weight}</span></span>
                 <span className="text-white text-sm font-medium w-6 text-right">{result}</span>
@@ -503,7 +507,7 @@ export function ProfileView({
             </div>
             {posts && posts.length > 0 && (
               <div className="pb-2 space-y-1 max-h-40 overflow-y-auto pr-1">
-                {posts.map((p, i) => {
+                {posts.slice(0, 5).map((p, i) => {
                   const text = typeof p === "string" ? p : p.text;
                   const url = typeof p === "string" ? undefined : p.url;
                   const snippet = text.length > 80 ? text.slice(0, 80) + "…" : text;
@@ -524,6 +528,14 @@ export function ProfileView({
                     </p>
                   );
                 })}
+                {posts.length > 5 && dim && (
+                  <button
+                    onClick={() => setExpandedTweetDim(dim)}
+                    className="text-[10px] text-[#c9a84c]/70 hover:text-[#c9a84c] pl-1"
+                  >
+                    + {posts.length - 5} more →
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -559,8 +571,8 @@ export function ProfileView({
                     const r2 = Math.floor(builder * 0.35);
                     const r3 = base - r1 - r2;
                     return <>
-                      <Row label="SOCIAL PROOF" value={social} weight="35%" result={r1} posts={socialPosts} />
-                      <Row label="BUILDER PROOF" value={builder} weight="35%" result={r2} posts={builderPosts} />
+                      <Row label="SOCIAL PROOF" value={social} weight="35%" result={r1} posts={socialPosts} dim="social" />
+                      <Row label="BUILDER PROOF" value={builder} weight="35%" result={r2} posts={builderPosts} dim="builder" />
                       {work > 0
                         ? <Row label="WORK PROOF" value={work} weight="30%" result={r3} />
                         : (
@@ -620,6 +632,50 @@ export function ProfileView({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Analyzed tweets modal (full list per dimension) ── */}
+      {expandedTweetDim && (() => {
+        const posts = expandedTweetDim === "social" ? socialPosts : builderPosts;
+        const title = expandedTweetDim === "social" ? "SOCIAL PROOF — analyzed tweets" : "BUILDER PROOF — analyzed tweets";
+        return (
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center px-4"
+            onClick={() => setExpandedTweetDim(null)}
+          >
+            <div
+              className="max-w-md w-full mx-4 bg-[#0c0c14] border border-white/10 rounded-2xl p-6 max-h-[80vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                <span className="font-[family-name:var(--font-mono)] text-xs tracking-widest text-white/40">{title} ({posts.length})</span>
+                <button onClick={() => setExpandedTweetDim(null)} className="text-white/40 hover:text-white text-xl leading-none transition-colors">×</button>
+              </div>
+              <div className="space-y-2 overflow-y-auto pr-1">
+                {posts.map((p, i) => {
+                  const text = typeof p === "string" ? p : p.text;
+                  const url = typeof p === "string" ? undefined : p.url;
+                  return url ? (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-xs text-white/50 hover:text-[#c9a84c] leading-relaxed p-2 rounded-lg border border-white/[0.06] hover:border-[#c9a84c]/40 bg-white/[0.02] transition-colors"
+                    >
+                      {text}
+                    </a>
+                  ) : (
+                    <p key={i} className="text-xs text-white/50 leading-relaxed p-2 rounded-lg border border-white/[0.06] bg-white/[0.02]">
+                      {text}
+                    </p>
+                  );
+                })}
+                {posts.length === 0 && <p className="text-xs text-white/30 text-center py-6">No tweets to show.</p>}
+              </div>
             </div>
           </div>
         );
