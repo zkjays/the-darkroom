@@ -140,10 +140,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Failed to fetch tweets" }, { status: 502 });
       }
       const tweetsData = await tweetsRes.json();
+      const rawCount = (tweetsData.data ?? []).length;
       const original = (tweetsData.data ?? [])
         .filter((t: TweetRaw) => !t.in_reply_to_user_id || t.in_reply_to_user_id === userId)
         .map((t: TweetRaw) => ({ id: t.id, text: t.text.slice(0, 280) }));
       recentTweets.push(...original);
+      console.log(
+        `refresh: page ${page + 1}/${MAX_PAGES} — fetched ${rawCount} raw, ${original.length} original, ` +
+        `${recentTweets.length} total so far, next_token=${tweetsData.meta?.next_token ? "yes" : "no"}, ` +
+        `result_count=${tweetsData.meta?.result_count ?? "?"}`
+      );
 
       paginationToken = tweetsData.meta?.next_token;
       if (!paginationToken || recentTweets.length >= TARGET_ORIGINAL_TWEETS) break;
