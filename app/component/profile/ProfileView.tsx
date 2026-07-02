@@ -84,7 +84,6 @@ export function ProfileView({
 }) {
   const accentHex = ACCENT_HEX[accent] ?? "#c9a84c";
   const handle = data.handle;
-  const totalScore = data.total_score ?? (data.score + (data.bonus_points ?? 0));
   const claimHref = refParam ? `/darkroom-id?ref=${encodeURIComponent(refParam)}` : "/darkroom-id";
 
   const [localProofs, setLocalProofs] = useState<WorkProof[]>(proofs);
@@ -93,8 +92,66 @@ export function ProfileView({
   const [shareCopied, setShareCopied] = useState(false);
   const [privateModalOpen, setPrivateModalOpen] = useState(false);
   const [makingPublic, setMakingPublic] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshOverride, setRefreshOverride] = useState<Partial<DashboardData> | null>(null);
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
 
   useEffect(() => { setLocalProofs(proofs); }, [proofs]);
+
+  // Merged view: refresh response overrides the score-related fields locally,
+  // without needing a full page reload to see the new numbers.
+  const effective: DashboardData = refreshOverride ? { ...data, ...refreshOverride } : data;
+  const totalScore = effective.total_score ?? (effective.score + (effective.bonus_points ?? 0));
+
+  // `now` is ticked via effect (not read from Date.now() during render) so the cooldown
+  // countdown stays a pure render while still updating live.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const REFRESH_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  const lastRefreshAt = effective.last_refresh_at ? new Date(effective.last_refresh_at).getTime() : null;
+  const cooldownRemainingMs = lastRefreshAt ? Math.max(0, lastRefreshAt + REFRESH_COOLDOWN_MS - now) : 0;
+  const canRefresh = cooldownRemainingMs <= 0;
+
+  const runRefresh = async () => {
+    if (refreshing || !canRefresh) return;
+    setRefreshing(true);
+    setRefreshMsg(null);
+    try {
+      const res = await fetch("/api/refresh", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setRefreshMsg(json.error ?? "Refresh failed");
+        return;
+      }
+      setRefreshOverride({
+        social_proof: json.social_proof,
+        builder_proof: json.builder_proof,
+        score: json.score,
+        total_score: json.total_score,
+        last_refresh_at: json.last_refresh_at,
+        ...(json.analyzed_posts ? { analyzed_posts: json.analyzed_posts } : {}),
+      });
+      setRefreshMsg(
+        json.insufficient_original_posts
+          ? "Not enough original posts in your recent activity — scores unchanged."
+          : "Scores refreshed."
+      );
+    } catch {
+      setRefreshMsg("Refresh failed — try again.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const ringColor = "rgba(255,255,255,0.75)";
 
@@ -171,10 +228,15 @@ export function ProfileView({
                 <h1 className="text-lg font-medium text-white tracking-tight leading-tight">@{handle}</h1>
                 <p className="font-[family-name:var(--font-mono)] text-[11px] text-slate-500">{data.archetype}</p>
               </div>
-              <div className="flex items-baseline gap-1.5">
+              <button
+                onClick={() => setShowBreakdown(true)}
+                className="flex items-baseline gap-1.5 group"
+                title="Score breakdown"
+              >
                 <span className="font-[family-name:var(--font-mono)] text-[8px] tracking-[0.25em] uppercase" style={{ color: "rgba(201,168,76,0.6)" }}>Score</span>
-                <span className="text-xl font-bold leading-none" style={{ color: "#c9a84c" }}>{totalScore}</span>
-              </div>
+                <span className="text-xl font-bold leading-none group-hover:opacity-80 transition-opacity" style={{ color: "#c9a84c" }}>{totalScore}</span>
+                <span className="font-[family-name:var(--font-mono)] text-[8px] text-white/20 group-hover:text-white/40 transition-colors">↗</span>
+              </button>
             </div>
 
             {/* MIDDLE — bio + socials + badges */}
@@ -229,17 +291,33 @@ export function ProfileView({
               </div>
             </div>
 
-            {/* RIGHT — 3 compact rings */}
-            <div className="flex items-center justify-center gap-3 flex-shrink-0 md:border-l md:border-white/[0.06] md:pl-5">
-              <ProofRing
-                value={data.social_proof ?? 0} color={ringColor} label="Social" sublabel="Proof" size={76}
-                onClick={owner && onRingClick ? () => onRingClick("social", data.social_proof ?? 0, ringColor) : undefined}
-              />
-              <ProofRing
-                value={data.builder_proof ?? 0} color={ringColor} label="Builder" sublabel="Proof" size={76}
-                onClick={owner && onRingClick ? () => onRingClick("builder", data.builder_proof ?? 0, ringColor) : undefined}
-              />
-              <ProofRing value={data.work_proof ?? 0} color="#c9a84c" label="Work" sublabel="Proof" size={76} />
+            {/* RIGHT — Proof section: refresh control + 3 compact rings */}
+            <div className="flex flex-col items-center gap-1.5 flex-shrink-0 md:border-l md:border-white/[0.06] md:pl-5">
+              {owner && (
+                <button
+                  onClick={runRefresh}
+                  disabled={refreshing || !canRefresh}
+                  title={canRefresh ? "Refresh your Social and Builder scores" : "Available once every 24h"}
+                  className="self-end font-[family-name:var(--font-mono)] text-[9px] tracking-widest uppercase text-white/30 hover:text-white/70 disabled:hover:text-white/30 disabled:opacity-40 transition-colors flex items-center gap-1"
+                >
+                  <span className={refreshing ? "animate-spin inline-block" : "inline-block"}>↻</span>
+                  {refreshing ? "Refreshing…" : canRefresh ? "Refresh" : `${Math.ceil(cooldownRemainingMs / 3_600_000)}h`}
+                </button>
+              )}
+              <div className="flex items-center justify-center gap-3">
+                <ProofRing
+                  value={effective.social_proof ?? 0} color={ringColor} label="Social" sublabel="Proof" size={76}
+                  onClick={owner && onRingClick ? () => onRingClick("social", effective.social_proof ?? 0, ringColor) : undefined}
+                />
+                <ProofRing
+                  value={effective.builder_proof ?? 0} color={ringColor} label="Builder" sublabel="Proof" size={76}
+                  onClick={owner && onRingClick ? () => onRingClick("builder", effective.builder_proof ?? 0, ringColor) : undefined}
+                />
+                <ProofRing value={effective.work_proof ?? 0} color="#c9a84c" label="Work" sublabel="Proof" size={76} />
+              </div>
+              {owner && refreshMsg && (
+                <p className="font-[family-name:var(--font-mono)] text-[9px] text-white/40 text-center max-w-[220px]">{refreshMsg}</p>
+              )}
             </div>
           </div>
         </div>
@@ -381,6 +459,153 @@ export function ProfileView({
           </div>
         </div>
       )}
+
+      {/* ── Score breakdown modal ── */}
+      {showBreakdown && (() => {
+        const social = effective.social_proof ?? 0;
+        const builder = effective.builder_proof ?? 0;
+        const work = effective.work_proof ?? 0;
+        const base = effective.score;
+        const bonus = effective.bonus_points ?? 0;
+        const total = totalScore;
+
+        const calcPts = (p: WorkProof) => {
+          const pts = WORK_PROOF_POINTS[p.proof_type] ?? 3;
+          const count = p.endorsement_count ?? 0;
+          const mult = count >= 3 ? 1.5 : count >= 1 ? 1.0 : 0.5;
+          return Math.round(pts * mult);
+        };
+        const builderProofs = localProofs.filter(p => PROOF_CATEGORY_MAP[p.proof_type] === "builder");
+        const socialWorkProofs = localProofs.filter(p => PROOF_CATEGORY_MAP[p.proof_type] === "social");
+        const bValidated = builderProofs.filter(p => (p.endorsement_count ?? 0) >= 3);
+        const bPending   = builderProofs.filter(p => (p.endorsement_count ?? 0) < 3);
+        const sValidated = socialWorkProofs.filter(p => (p.endorsement_count ?? 0) >= 3);
+        const sPending   = socialWorkProofs.filter(p => (p.endorsement_count ?? 0) < 3);
+        const bValidatedPts = bValidated.reduce((s, p) => s + calcPts(p), 0);
+        const bPendingPts   = bPending.reduce((s, p) => s + calcPts(p), 0);
+        const sValidatedPts = sValidated.reduce((s, p) => s + calcPts(p), 0);
+        const sPendingPts   = sPending.reduce((s, p) => s + calcPts(p), 0);
+
+        const analyzedPosts = effective.analyzed_posts ?? {};
+        const socialPosts = analyzedPosts.social ?? [];
+        const builderPosts = analyzedPosts.builder ?? [];
+
+        const Row = ({ label, value, weight, result, posts }: { label: string; value: number; weight: string; result: number; posts?: string[] }) => (
+          <div className="border-b border-white/[0.04] last:border-0">
+            <div className="flex items-center justify-between py-1.5">
+              <span className="font-[family-name:var(--font-mono)] text-[10px] tracking-widest text-white/40">{label}</span>
+              <div className="flex items-center gap-3 text-right">
+                <span className="text-white/55 text-xs">{value}<span className="text-white/25 text-[10px]"> × {weight}</span></span>
+                <span className="text-white text-sm font-medium w-6 text-right">{result}</span>
+              </div>
+            </div>
+            {posts && posts.length > 0 && (
+              <div className="pb-2 space-y-1">
+                {posts.map((t, i) => (
+                  <p key={i} className="text-[10px] text-white/25 leading-relaxed pl-1 border-l border-white/10 truncate" title={t}>
+                    {t.length > 80 ? t.slice(0, 80) + "…" : t}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+        return (
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center"
+            onClick={() => setShowBreakdown(false)}
+          >
+            <div
+              className="max-w-sm w-full mx-4 bg-[#0c0c14] border border-white/10 rounded-2xl p-6 space-y-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <span className="font-[family-name:var(--font-mono)] text-xs tracking-widest text-white/40">SCORE BREAKDOWN</span>
+                <button onClick={() => setShowBreakdown(false)} className="text-white/40 hover:text-white text-xl leading-none transition-colors">×</button>
+              </div>
+
+              {/* Total */}
+              <div className="text-center py-2">
+                <div className="text-4xl font-bold" style={{ color: "#c9a84c" }}>{total}</div>
+                <div className="font-[family-name:var(--font-mono)] text-[10px] tracking-widest text-white/30 mt-1">{data.archetype}</div>
+              </div>
+
+              {/* Calculation */}
+              <div>
+                <p className="font-[family-name:var(--font-mono)] text-[9px] tracking-[0.2em] text-white/25 uppercase mb-2">How it&apos;s calculated</p>
+                <div className="bg-white/[0.03] rounded-xl px-4 py-2 space-y-0">
+                  {(() => {
+                    const r1 = Math.floor(social * 0.35);
+                    const r2 = Math.floor(builder * 0.35);
+                    const r3 = base - r1 - r2;
+                    return <>
+                      <Row label="SOCIAL PROOF" value={social} weight="35%" result={r1} posts={socialPosts} />
+                      <Row label="BUILDER PROOF" value={builder} weight="35%" result={r2} posts={builderPosts} />
+                      {work > 0
+                        ? <Row label="WORK PROOF" value={work} weight="30%" result={r3} />
+                        : (
+                          <div className="flex items-center justify-between py-1.5">
+                            <span className="font-[family-name:var(--font-mono)] text-[10px] tracking-widest text-white/20">🔒 WORK PROOF</span>
+                            <span className="text-[10px] text-white/20">+30 pts unlockable</span>
+                          </div>
+                        )
+                      }
+                    </>;
+                  })()}
+                </div>
+                {work === 0 && (
+                  <p className="text-[10px] text-white/30 mt-2 px-1">Submit your first proof to unlock the full 100-point score.</p>
+                )}
+                <div className="mt-2 px-4 space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-white/40">Base score</span>
+                    <span className="text-white/75">{base}</span>
+                  </div>
+                  {bonus > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/40">XP bonus</span>
+                      <span className="text-white/75">+{bonus}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-bold pt-1 border-t border-white/[0.06]">
+                    <span className="font-[family-name:var(--font-mono)] text-[10px] tracking-widest" style={{ color: "rgba(201,168,76,0.7)" }}>TOTAL</span>
+                    <span style={{ color: "#c9a84c" }}>{total}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Work proof detail */}
+              {localProofs.length > 0 && (
+                <div>
+                  <p className="font-[family-name:var(--font-mono)] text-[9px] tracking-[0.2em] text-white/25 uppercase mb-2">Work proof detail</p>
+                  <div className="bg-white/[0.03] rounded-xl px-4 py-3 space-y-2">
+                    {builderProofs.length > 0 && (
+                      <div>
+                        <span className="font-[family-name:var(--font-mono)] text-[9px] tracking-widest text-white/30">BUILDER</span>
+                        <div className="mt-1 space-y-0.5">
+                          {bValidated.length > 0 && <p className="text-xs text-white/60">{bValidated.length} validated · <span className="text-white/40">{bValidatedPts} pts</span></p>}
+                          {bPending.length > 0  && <p className="text-xs text-white/35">{bPending.length} pending · <span className="text-white/25">{bPendingPts} pts</span></p>}
+                        </div>
+                      </div>
+                    )}
+                    {socialWorkProofs.length > 0 && (
+                      <div className={builderProofs.length > 0 ? "pt-2 border-t border-white/[0.04]" : ""}>
+                        <span className="font-[family-name:var(--font-mono)] text-[9px] tracking-widest text-white/30">SOCIAL</span>
+                        <div className="mt-1 space-y-0.5">
+                          {sValidated.length > 0 && <p className="text-xs text-white/60">{sValidated.length} validated · <span className="text-white/40">{sValidatedPts} pts</span></p>}
+                          {sPending.length > 0  && <p className="text-xs text-white/35">{sPending.length} pending · <span className="text-white/25">{sPendingPts} pts</span></p>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Analysis modal (owner) ── */}
       {owner && analysisOpen && data.analysis && (

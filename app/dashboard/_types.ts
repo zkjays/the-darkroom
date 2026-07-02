@@ -18,6 +18,8 @@ export interface DashboardData {
   social_proof?: number;
   builder_proof?: number;
   work_proof?: number;
+  analyzed_posts?: { social?: string[]; builder?: string[] };
+  last_refresh_at?: string;
   archetype: string;
   tagline: string;
   analysis: string;
