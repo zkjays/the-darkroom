@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { sanitizeHandle } from "@/app/lib/sanitize";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
@@ -24,6 +26,16 @@ export async function POST(req: NextRequest) {
 
   if (!handle) {
     return NextResponse.json({ error: "Missing handle" }, { status: 400 });
+  }
+
+  // Security: only the authenticated owner of a handle can trigger its refresh.
+  const session = await getServerSession(authOptions);
+  const sessionHandle = (session as { handle?: string } | null)?.handle;
+  if (!sessionHandle) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (sanitizeHandle(sessionHandle) !== handle) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   if (!checkRateLimit(handle, 1, 60 * 1000)) {
@@ -99,13 +111,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "X user not found" }, { status: 404 });
   }
 
-  // Step 4: Fetch last 10 tweets
+  // Step 4: Fetch last 50 tweets, keep original posts / self-threads only
   let recentTweets: string[] = [];
   const tweetsController = new AbortController();
   const tweetsTimeout = setTimeout(() => tweetsController.abort(), 10000);
   try {
     const tweetsRes = await fetch(
-      `https://api.x.com/2/users/${userId}/tweets?max_results=10&tweet.fields=text,public_metrics`,
+      `https://api.x.com/2/users/${userId}/tweets?max_results=50&tweet.fields=text,public_metrics,in_reply_to_user_id&exclude=retweets`,
       {
         headers: { Authorization: `Bearer ${bearerToken}` },
         next: { revalidate: 0 },
@@ -115,8 +127,11 @@ export async function POST(req: NextRequest) {
     clearTimeout(tweetsTimeout);
     if (tweetsRes.ok) {
       const tweetsData = await tweetsRes.json();
-      type TweetRaw = { text: string };
-      recentTweets = (tweetsData.data ?? []).map((t: TweetRaw) => t.text.slice(0, 280));
+      type TweetRaw = { text: string; in_reply_to_user_id?: string };
+      // Keep original posts and self-threads; drop replies under other people's posts.
+      recentTweets = (tweetsData.data ?? [])
+        .filter((t: TweetRaw) => !t.in_reply_to_user_id || t.in_reply_to_user_id === userId)
+        .map((t: TweetRaw) => t.text.slice(0, 280));
     } else {
       const body = await tweetsRes.text().catch(() => "");
       console.log("refresh: tweets fetch failed —", tweetsRes.status, body);
@@ -129,59 +144,90 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: reason }, { status: 502 });
   }
 
-  // Step 5: Call Claude
-  const tweetsText = recentTweets.length > 0
-    ? recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\n")
-    : "(no recent tweets available)";
-
-  const claudeController = new AbortController();
-  const claudeTimeout = setTimeout(() => claudeController.abort(), 15000);
+  // If every recent tweet turned out to be a reply (dropped by the filter above), there is
+  // nothing original to score. Scoring against an empty prompt would let the AI guess/hallucinate
+  // a number, which silently corrupts the profile's score. Keep the existing scores untouched
+  // instead and flag it so the UI can say so honestly.
+  const insufficientOriginalPosts = recentTweets.length === 0;
 
   let newSocialProof: number;
   let newBuilderProof: number;
+  let analyzedPosts: { social: string[]; builder: string[] } = { social: [], builder: [] };
 
-  try {
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 100,
-        temperature: 0.3,
-        system: `You are the Darkroom scoring engine. Analyze these recent tweets and return ONLY valid JSON, no markdown.
+  if (insufficientOriginalPosts) {
+    newSocialProof = record.social_proof ?? 0;
+    newBuilderProof = record.builder_proof ?? 0;
+  } else {
+    // Step 5: Call Claude
+    const tweetsText = recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\n");
+
+    const claudeController = new AbortController();
+    const claudeTimeout = setTimeout(() => claudeController.abort(), 15000);
+
+    try {
+      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 100,
+          temperature: 0.3,
+          system: `You are the Darkroom scoring engine. Analyze these recent tweets and return ONLY valid JSON, no markdown.
 Handle: ${handle}
-Recent tweets: ${tweetsText}
+Recent tweets (numbered):
+${tweetsText}
+
 Score on 2 dimensions (0-100):
+- social_proof: posting consistency, engagement quality, personal brand clarity
+- builder_proof: technical content, projects mentioned, build-in-public signals
 
-social_proof: posting consistency, engagement quality, personal brand clarity
-builder_proof: technical content, projects mentioned, build-in-public signals
+Also classify which tweet numbers (1-based) contributed most to each dimension (max 10 per category, only the strongest signals).
 
-Return ONLY: { "social_proof": number, "builder_proof": number }`,
-        messages: [{ role: "user", content: "Score this profile." }],
-      }),
-      signal: claudeController.signal,
-    });
-    clearTimeout(claudeTimeout);
+Return ONLY:
+{
+  "social_proof": number,
+  "builder_proof": number,
+  "social_indices": [array of tweet numbers],
+  "builder_indices": [array of tweet numbers]
+}`,
+          messages: [{ role: "user", content: "Score this profile." }],
+        }),
+        signal: claudeController.signal,
+      });
+      clearTimeout(claudeTimeout);
 
-    if (!claudeRes.ok) {
-      console.log("refresh: Claude failed —", claudeRes.status);
-      return NextResponse.json({ error: "AI scoring failed" }, { status: 502 });
+      if (!claudeRes.ok) {
+        console.log("refresh: Claude failed —", claudeRes.status);
+        return NextResponse.json({ error: "AI scoring failed" }, { status: 502 });
+      }
+
+      const claudeData = await claudeRes.json();
+      const raw = claudeData.content?.[0]?.text ?? "";
+      const jsonText = raw.match(/\{[\s\S]*\}/)?.[0] ?? raw;
+      const parsed = JSON.parse(jsonText) as {
+        social_proof: number;
+        builder_proof: number;
+        social_indices?: number[];
+        builder_indices?: number[];
+      };
+      newSocialProof = Math.min(100, Math.max(0, Math.round(parsed.social_proof)));
+      newBuilderProof = Math.min(100, Math.max(0, Math.round(parsed.builder_proof)));
+      const toTexts = (indices: number[] | undefined) =>
+        (indices ?? []).map((i) => recentTweets[i - 1]).filter(Boolean);
+      analyzedPosts = {
+        social: toTexts(parsed.social_indices),
+        builder: toTexts(parsed.builder_indices),
+      };
+    } catch (e) {
+      clearTimeout(claudeTimeout);
+      const reason = e instanceof Error && e.name === "AbortError" ? "AI scoring timed out" : "AI scoring failed";
+      console.log("refresh:", reason, e);
+      return NextResponse.json({ error: reason }, { status: 502 });
     }
-
-    const claudeData = await claudeRes.json();
-    const raw = claudeData.content?.[0]?.text ?? "";
-    const parsed = JSON.parse(raw) as { social_proof: number; builder_proof: number };
-    newSocialProof = Math.min(100, Math.max(0, Math.round(parsed.social_proof)));
-    newBuilderProof = Math.min(100, Math.max(0, Math.round(parsed.builder_proof)));
-  } catch (e) {
-    clearTimeout(claudeTimeout);
-    const reason = e instanceof Error && e.name === "AbortError" ? "AI scoring timed out" : "AI scoring failed";
-    console.log("refresh:", reason, e);
-    return NextResponse.json({ error: reason }, { status: 502 });
   }
 
   // Step 6: Recalculate score
@@ -192,15 +238,21 @@ Return ONLY: { "social_proof": number, "builder_proof": number }`,
   const nextRefreshAt = new Date(Date.now() + TWENTY_FOUR_HOURS_MS).toISOString();
 
   // Step 7: Persist
+  // When there weren't enough original posts to rescore, don't overwrite analyzed_posts —
+  // it would wipe out the last good breakdown with an empty one.
+  const updatePayload: Record<string, unknown> = {
+    social_proof: newSocialProof,
+    builder_proof: newBuilderProof,
+    score: newScore,
+    last_refresh_at: lastRefreshAt,
+  };
+  if (!insufficientOriginalPosts) {
+    updatePayload.analyzed_posts = analyzedPosts;
+  }
+
   const { error: updateError } = await db
     .from("darkroom_ids")
-    .update({
-      social_proof: newSocialProof,
-      builder_proof: newBuilderProof,
-      score: newScore,
-      total_score: totalScore,
-      last_refresh_at: lastRefreshAt,
-    })
+    .update(updatePayload)
     .eq("handle", handle);
 
   if (updateError) {
@@ -215,5 +267,7 @@ Return ONLY: { "social_proof": number, "builder_proof": number }`,
     total_score: totalScore,
     last_refresh_at: lastRefreshAt,
     next_refresh_at: nextRefreshAt,
+    insufficient_original_posts: insufficientOriginalPosts,
+    ...(insufficientOriginalPosts ? {} : { analyzed_posts: analyzedPosts }),
   });
 }

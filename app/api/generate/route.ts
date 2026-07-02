@@ -327,7 +327,7 @@ ${replyTweets.length > 0 ? replyTweets.map((t, i) => `${i + 1}. ${t}`).join("\n"
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 1024,
         temperature: 0.3,
         system: `You are The Darkroom ID generator. Analyze the user's X profile data and their stated goals to produce a builder identity score across two dimensions.
@@ -399,7 +399,8 @@ Respond ONLY with JSON (no markdown, no backticks):
 
     const claudeData = await claudeRes.json();
     const raw = claudeData.content?.[0]?.text ?? "";
-    const parsed = JSON.parse(raw) as {
+    const jsonText = raw.match(/\{[\s\S]*\}/)?.[0] ?? raw;
+    const parsed = JSON.parse(jsonText) as {
       social_proof: number;
       builder_proof: number;
       archetype: string;
