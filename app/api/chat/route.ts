@@ -40,7 +40,7 @@ The 9 archetypes:
 - NPC (for now) (<14): everyone's origin story starts somewhere
 
 Key features:
-- Daily Refresh: refresh Social and Builder scores once per day (Claude re-analyzes X activity)
+- Daily Refresh: a manual "Refresh scores" button in the profile's action row (next to "Edit profile") — click it yourself to re-analyze your latest X activity (Claude re-scores Social + Builder). Limited to once every 24h per profile; the button shows a countdown when on cooldown.
 - Work Tab: submit proof links — GitHub, deployed projects, articles, prototypes
 - Endorsements: 3 endorsements validates a proof, grows Work Proof score
 - Darkroom ID: public builder profile at thedarkroom.xyz/p/[handle]

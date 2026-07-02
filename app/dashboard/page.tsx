@@ -54,7 +54,7 @@ const TOUR_STEPS = [
     icon: "↻",
     iconColor: "#c9a84c",
     content: "Once a day, you can refresh your Social and Builder scores. Claude re-analyzes your latest X activity. Make it a daily ritual — post something, then refresh.",
-    hint: "The refresh button is in the Proof section header.",
+    hint: "Look for the gold \"Refresh scores\" button next to Edit profile, below your rings.",
   },
   {
     title: "Work Tab",

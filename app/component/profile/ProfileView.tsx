@@ -291,19 +291,8 @@ export function ProfileView({
               </div>
             </div>
 
-            {/* RIGHT — Proof section: refresh control + 3 compact rings */}
+            {/* RIGHT — Proof section: 3 compact rings */}
             <div className="flex flex-col items-center gap-1.5 flex-shrink-0 md:border-l md:border-white/[0.06] md:pl-5">
-              {owner && (
-                <button
-                  onClick={runRefresh}
-                  disabled={refreshing || !canRefresh}
-                  title={canRefresh ? "Refresh your Social and Builder scores" : "Available once every 24h"}
-                  className="self-end font-[family-name:var(--font-mono)] text-[9px] tracking-widest uppercase text-white/30 hover:text-white/70 disabled:hover:text-white/30 disabled:opacity-40 transition-colors flex items-center gap-1"
-                >
-                  <span className={refreshing ? "animate-spin inline-block" : "inline-block"}>↻</span>
-                  {refreshing ? "Refreshing…" : canRefresh ? "Refresh" : `${Math.ceil(cooldownRemainingMs / 3_600_000)}h`}
-                </button>
-              )}
               <div className="flex items-center justify-center gap-3">
                 <ProofRing
                   value={effective.social_proof ?? 0} color={ringColor} label="Social" sublabel="Proof" size={76}
@@ -333,6 +322,16 @@ export function ProfileView({
             </button>
             {owner ? (
               <>
+                <button
+                  onClick={runRefresh}
+                  disabled={refreshing || !canRefresh}
+                  title={canRefresh ? "Refresh your Social and Builder scores" : "Available once every 24h"}
+                  className="font-[family-name:var(--font-mono)] text-[11px] tracking-widest uppercase border rounded-sm px-4 py-2 transition-all disabled:opacity-40"
+                  style={{ borderColor: "rgba(201,168,76,0.4)", color: "#c9a84c" }}
+                >
+                  <span className={refreshing ? "inline-block animate-spin mr-1" : "inline-block mr-1"}>↻</span>
+                  {refreshing ? "Refreshing…" : canRefresh ? "Refresh scores" : `Refresh in ${Math.ceil(cooldownRemainingMs / 3_600_000)}h`}
+                </button>
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent("darkroom:switchTab", { detail: "settings" }))}
                   className="font-[family-name:var(--font-mono)] text-[11px] tracking-widest uppercase text-slate-400 hover:text-white border border-white/10 hover:border-white/25 rounded-sm px-4 py-2 transition-all"
