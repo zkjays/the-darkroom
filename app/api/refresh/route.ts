@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 100,
+          max_tokens: 800,
           temperature: 0.3,
           system: `You are the Darkroom scoring engine. Analyze these recent tweets and return ONLY valid JSON, no markdown.
 Handle: ${handle}
@@ -186,14 +186,14 @@ Score on 2 dimensions (0-100):
 - social_proof: posting consistency, engagement quality, personal brand clarity
 - builder_proof: technical content, projects mentioned, build-in-public signals
 
-Also classify which tweet numbers (1-based) contributed most to each dimension (max 10 per category, only the strongest signals).
+Then go through every tweet number (1-based) and decide which ONE dimension it primarily signals — social_proof or builder_proof, never both. A tweet that is clearly both (e.g. "shipped X, here's the thread") goes to whichever it signals more strongly, not to both lists. Skip tweets that signal neither (pure banter, one-word replies, no real content). List every tweet that does signal something — do not cap it to a top N, include all of them.
 
 Return ONLY:
 {
   "social_proof": number,
   "builder_proof": number,
-  "social_indices": [array of tweet numbers],
-  "builder_indices": [array of tweet numbers]
+  "social_indices": [array of tweet numbers, no overlap with builder_indices],
+  "builder_indices": [array of tweet numbers, no overlap with social_indices]
 }`,
           messages: [{ role: "user", content: "Score this profile." }],
         }),
@@ -217,6 +217,11 @@ Return ONLY:
       };
       newSocialProof = Math.min(100, Math.max(0, Math.round(parsed.social_proof)));
       newBuilderProof = Math.min(100, Math.max(0, Math.round(parsed.builder_proof)));
+      // Defensive dedup: the prompt asks for no overlap, but if the model lists a tweet
+      // in both anyway, keep it in social and drop it from builder rather than showing
+      // the same tweet twice across both dimensions.
+      const socialIndexSet = new Set(parsed.social_indices ?? []);
+      const builderIndicesDeduped = (parsed.builder_indices ?? []).filter((i) => !socialIndexSet.has(i));
       const toPosts = (indices: number[] | undefined): AnalyzedPost[] =>
         (indices ?? [])
           .map((i) => recentTweets[i - 1])
@@ -224,7 +229,7 @@ Return ONLY:
           .map((t) => ({ id: t.id, text: t.text, url: `https://x.com/${handle}/status/${t.id}` }));
       analyzedPosts = {
         social: toPosts(parsed.social_indices),
-        builder: toPosts(parsed.builder_indices),
+        builder: toPosts(builderIndicesDeduped),
       };
     } catch (e) {
       clearTimeout(claudeTimeout);

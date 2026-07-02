@@ -493,14 +493,16 @@ export function ProfileView({
         const Row = ({ label, value, weight, result, posts }: { label: string; value: number; weight: string; result: number; posts?: PostRef[] }) => (
           <div className="border-b border-white/[0.04] last:border-0">
             <div className="flex items-center justify-between py-1.5">
-              <span className="font-[family-name:var(--font-mono)] text-[10px] tracking-widest text-white/40">{label}</span>
+              <span className="font-[family-name:var(--font-mono)] text-[10px] tracking-widest text-white/40">
+                {label}{posts && posts.length > 0 ? ` (${posts.length})` : ""}
+              </span>
               <div className="flex items-center gap-3 text-right">
                 <span className="text-white/55 text-xs">{value}<span className="text-white/25 text-[10px]"> × {weight}</span></span>
                 <span className="text-white text-sm font-medium w-6 text-right">{result}</span>
               </div>
             </div>
             {posts && posts.length > 0 && (
-              <div className="pb-2 space-y-1">
+              <div className="pb-2 space-y-1 max-h-40 overflow-y-auto pr-1">
                 {posts.map((p, i) => {
                   const text = typeof p === "string" ? p : p.text;
                   const url = typeof p === "string" ? undefined : p.url;
