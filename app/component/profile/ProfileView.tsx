@@ -6,6 +6,7 @@ import { ACCENT_HEX } from "../../dashboard/_styles";
 import { WORK_PROOF_POINTS, PROOF_CATEGORY_MAP } from "../../dashboard/_work-constants";
 import { ProofRing } from "../../dashboard/StatsPanel";
 import { ProofGrid } from "./ProofGrid";
+import { DarkCircle } from "./DarkCircle";
 
 const REFERRALS_NEEDED = 25;
 
@@ -396,6 +397,13 @@ export function ProfileView({
             />
           </div>
         </div>
+
+        {/* ── Owner-only: private DarkCircle watchlist ── */}
+        {owner && (
+          <div className="mt-10">
+            <DarkCircle handle={handle} />
+          </div>
+        )}
 
         {/* ── Owner-only: shareable card + re-analyze (below proofs) ── */}
         {owner && (
