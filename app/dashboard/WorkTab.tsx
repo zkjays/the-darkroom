@@ -90,7 +90,7 @@ export function WorkTab({
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("handle", editProof.handle);
+      formData.append("handle", handle);
       const res = await fetch("/api/upload-proof", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");
