@@ -9,16 +9,17 @@ const SUPABASE_STORAGE_HOST = "https://vwvluwaeiigognkgxbes.supabase.co";
 const isDev = process.env.NODE_ENV !== "production";
 
 // Turbopack's dev HMR bootstrap injects its own inline <script> and needs a
-// WebSocket connection back to the dev server — neither works under a strict
-// script-src, and neither exists in a production build. Relax only in dev;
-// production keeps the strict policy (no 'unsafe-inline'/'unsafe-eval').
-// TODO: replace the prod script-src with a per-request nonce (Next.js
-// middleware pattern) if streaming SSR ever needs an inline coordination
-// script — 'self' alone is enough for now since this app renders no
-// Suspense-streamed routes.
+// WebSocket connection back to the dev server. Separately, the App Router
+// itself (not just Suspense/streaming routes) injects inline
+// `self.__next_f.push(...)` scripts on every page to hydrate the RSC
+// payload — 'unsafe-inline' is required in prod too, or every page's
+// hydration (including the login button) breaks.
+// TODO: swap 'unsafe-inline' for a per-request nonce (Next.js middleware
+// pattern, https://nextjs.org/docs/app/guides/content-security-policy) to
+// close this back up without breaking hydration.
 const CSP = [
   "default-src 'self'",
-  isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self'",
+  isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: ${TWITTER_IMAGE_HOSTS} ${SUPABASE_STORAGE_HOST}`,
   isDev ? "connect-src 'self' ws:" : "connect-src 'self'",
