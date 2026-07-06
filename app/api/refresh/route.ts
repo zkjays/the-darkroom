@@ -111,32 +111,50 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "X user not found" }, { status: 404 });
   }
 
-  // Step 4: Fetch last 50 tweets, keep original posts / self-threads only
-  let recentTweets: string[] = [];
+  // Step 4: Paginate back through the timeline until we've collected enough original
+  // posts / self-threads. A single page of "recent activity" is mostly replies for
+  // some users — one page isn't enough to judge builder/social signal fairly.
+  type TweetRaw = { id: string; text: string; in_reply_to_user_id?: string };
+  const TARGET_ORIGINAL_TWEETS = 20;
+  const MAX_PAGES = 5;
+  const recentTweets: { id: string; text: string }[] = [];
+  let paginationToken: string | undefined;
   const tweetsController = new AbortController();
-  const tweetsTimeout = setTimeout(() => tweetsController.abort(), 10000);
+  const tweetsTimeout = setTimeout(() => tweetsController.abort(), 25000);
   try {
-    const tweetsRes = await fetch(
-      `https://api.x.com/2/users/${userId}/tweets?max_results=50&tweet.fields=text,public_metrics,in_reply_to_user_id&exclude=retweets`,
-      {
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const url = new URL(`https://api.x.com/2/users/${userId}/tweets`);
+      url.searchParams.set("max_results", "100");
+      url.searchParams.set("tweet.fields", "text,public_metrics,in_reply_to_user_id");
+      url.searchParams.set("exclude", "retweets");
+      if (paginationToken) url.searchParams.set("pagination_token", paginationToken);
+
+      const tweetsRes = await fetch(url, {
         headers: { Authorization: `Bearer ${bearerToken}` },
         next: { revalidate: 0 },
         signal: tweetsController.signal,
+      });
+      if (!tweetsRes.ok) {
+        const body = await tweetsRes.text().catch(() => "");
+        console.log("refresh: tweets fetch failed —", tweetsRes.status, body);
+        return NextResponse.json({ error: "Failed to fetch tweets" }, { status: 502 });
       }
-    );
-    clearTimeout(tweetsTimeout);
-    if (tweetsRes.ok) {
       const tweetsData = await tweetsRes.json();
-      type TweetRaw = { text: string; in_reply_to_user_id?: string };
-      // Keep original posts and self-threads; drop replies under other people's posts.
-      recentTweets = (tweetsData.data ?? [])
+      const rawCount = (tweetsData.data ?? []).length;
+      const original = (tweetsData.data ?? [])
         .filter((t: TweetRaw) => !t.in_reply_to_user_id || t.in_reply_to_user_id === userId)
-        .map((t: TweetRaw) => t.text.slice(0, 280));
-    } else {
-      const body = await tweetsRes.text().catch(() => "");
-      console.log("refresh: tweets fetch failed —", tweetsRes.status, body);
-      return NextResponse.json({ error: "Failed to fetch tweets" }, { status: 502 });
+        .map((t: TweetRaw) => ({ id: t.id, text: t.text.slice(0, 280) }));
+      recentTweets.push(...original);
+      console.log(
+        `refresh: page ${page + 1}/${MAX_PAGES} — fetched ${rawCount} raw, ${original.length} original, ` +
+        `${recentTweets.length} total so far, next_token=${tweetsData.meta?.next_token ? "yes" : "no"}, ` +
+        `result_count=${tweetsData.meta?.result_count ?? "?"}`
+      );
+
+      paginationToken = tweetsData.meta?.next_token;
+      if (!paginationToken || recentTweets.length >= TARGET_ORIGINAL_TWEETS) break;
     }
+    clearTimeout(tweetsTimeout);
   } catch (e) {
     clearTimeout(tweetsTimeout);
     const reason = e instanceof Error && e.name === "AbortError" ? "Tweets request timed out" : "X API request failed";
@@ -144,22 +162,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: reason }, { status: 502 });
   }
 
-  // If every recent tweet turned out to be a reply (dropped by the filter above), there is
-  // nothing original to score. Scoring against an empty prompt would let the AI guess/hallucinate
-  // a number, which silently corrupts the profile's score. Keep the existing scores untouched
-  // instead and flag it so the UI can say so honestly.
-  const insufficientOriginalPosts = recentTweets.length === 0;
+  // Even after paginating back up to 5 pages, too few original tweets means scoring
+  // would be statistically shaky (or, at zero, scoring against an empty prompt would
+  // let the AI guess/hallucinate a number). Keep the existing scores untouched instead
+  // and flag it so the UI can say so honestly rather than silently corrupting the score.
+  const MIN_ORIGINAL_TWEETS = 3;
+  const insufficientOriginalPosts = recentTweets.length < MIN_ORIGINAL_TWEETS;
 
+  type AnalyzedPost = { id: string; text: string; url: string };
   let newSocialProof: number;
   let newBuilderProof: number;
-  let analyzedPosts: { social: string[]; builder: string[] } = { social: [], builder: [] };
+  let analyzedPosts: { social: AnalyzedPost[]; builder: AnalyzedPost[] } = { social: [], builder: [] };
 
   if (insufficientOriginalPosts) {
     newSocialProof = record.social_proof ?? 0;
     newBuilderProof = record.builder_proof ?? 0;
   } else {
     // Step 5: Call Claude
-    const tweetsText = recentTweets.map((t, i) => `${i + 1}. ${t}`).join("\n");
+    const tweetsText = recentTweets.map((t, i) => `${i + 1}. ${t.text}`).join("\n");
 
     const claudeController = new AbortController();
     const claudeTimeout = setTimeout(() => claudeController.abort(), 15000);
@@ -174,7 +194,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 100,
+          max_tokens: 800,
           temperature: 0.3,
           system: `You are the Darkroom scoring engine. Analyze these recent tweets and return ONLY valid JSON, no markdown.
 Handle: ${handle}
@@ -185,14 +205,14 @@ Score on 2 dimensions (0-100):
 - social_proof: posting consistency, engagement quality, personal brand clarity
 - builder_proof: technical content, projects mentioned, build-in-public signals
 
-Also classify which tweet numbers (1-based) contributed most to each dimension (max 10 per category, only the strongest signals).
+Then go through every tweet number (1-based) and decide which ONE dimension it primarily signals — social_proof or builder_proof, never both. A tweet that is clearly both (e.g. "shipped X, here's the thread") goes to whichever it signals more strongly, not to both lists. Skip tweets that signal neither (pure banter, one-word replies, no real content). List every tweet that does signal something — do not cap it to a top N, include all of them.
 
 Return ONLY:
 {
   "social_proof": number,
   "builder_proof": number,
-  "social_indices": [array of tweet numbers],
-  "builder_indices": [array of tweet numbers]
+  "social_indices": [array of tweet numbers, no overlap with builder_indices],
+  "builder_indices": [array of tweet numbers, no overlap with social_indices]
 }`,
           messages: [{ role: "user", content: "Score this profile." }],
         }),
@@ -216,11 +236,19 @@ Return ONLY:
       };
       newSocialProof = Math.min(100, Math.max(0, Math.round(parsed.social_proof)));
       newBuilderProof = Math.min(100, Math.max(0, Math.round(parsed.builder_proof)));
-      const toTexts = (indices: number[] | undefined) =>
-        (indices ?? []).map((i) => recentTweets[i - 1]).filter(Boolean);
+      // Defensive dedup: the prompt asks for no overlap, but if the model lists a tweet
+      // in both anyway, keep it in social and drop it from builder rather than showing
+      // the same tweet twice across both dimensions.
+      const socialIndexSet = new Set(parsed.social_indices ?? []);
+      const builderIndicesDeduped = (parsed.builder_indices ?? []).filter((i) => !socialIndexSet.has(i));
+      const toPosts = (indices: number[] | undefined): AnalyzedPost[] =>
+        (indices ?? [])
+          .map((i) => recentTweets[i - 1])
+          .filter(Boolean)
+          .map((t) => ({ id: t.id, text: t.text, url: `https://x.com/${handle}/status/${t.id}` }));
       analyzedPosts = {
-        social: toTexts(parsed.social_indices),
-        builder: toTexts(parsed.builder_indices),
+        social: toPosts(parsed.social_indices),
+        builder: toPosts(builderIndicesDeduped),
       };
     } catch (e) {
       clearTimeout(claudeTimeout);
