@@ -53,12 +53,28 @@ export async function GET(req: NextRequest) {
 
 const BIO_MAX = 160;
 
-// Normalize an optional link field to a trimmed string or null (empty = clear it)
-function cleanLink(v: unknown): string | null {
+// Links are rendered as raw <a href> on the public profile (ProfileView) — a
+// javascript: URI here is stored XSS, so only http(s) is accepted (same rule
+// as proof_value/image_url in /api/goals).
+const HTTP_URL_RE = /^https?:\/\//i;
+
+// Matches any explicit scheme prefix (javascript:, data:, vbscript:, …).
+const ANY_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
+
+// Normalize an optional link field to a trimmed string or null (empty = clear it).
+// Scheme-less input ("github.com/foo") gets https:// prepended — users rarely type
+// the scheme and the settings UI has no error display. An explicit non-http scheme
+// throws so PATCH returns 400 instead of silently storing a dangerous value.
+function cleanLink(v: unknown, field: string): string | null {
   if (typeof v !== "string") return null;
   const t = v.trim();
-  return t.length === 0 ? null : t.slice(0, 200);
+  if (t.length === 0) return null;
+  if (HTTP_URL_RE.test(t)) return t.slice(0, 200);
+  if (ANY_SCHEME_RE.test(t)) throw new InvalidLinkError(`${field} must be a valid http(s) URL`);
+  return `https://${t}`.slice(0, 200);
 }
+
+class InvalidLinkError extends Error {}
 
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -78,9 +94,16 @@ export async function PATCH(req: NextRequest) {
   if (typeof theme_accent === "string") updates.theme_accent = theme_accent;
   if (typeof open_to_opportunities === "boolean") updates.open_to_opportunities = open_to_opportunities;
   if (typeof bio === "string") updates.bio = bio.trim().slice(0, BIO_MAX) || null;
-  if (link_x !== undefined) updates.link_x = cleanLink(link_x);
-  if (link_github !== undefined) updates.link_github = cleanLink(link_github);
-  if (link_site !== undefined) updates.link_site = cleanLink(link_site);
+  try {
+    if (link_x !== undefined) updates.link_x = cleanLink(link_x, "link_x");
+    if (link_github !== undefined) updates.link_github = cleanLink(link_github, "link_github");
+    if (link_site !== undefined) updates.link_site = cleanLink(link_site, "link_site");
+  } catch (e) {
+    if (e instanceof InvalidLinkError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    throw e;
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });

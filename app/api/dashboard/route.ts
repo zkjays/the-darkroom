@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { sanitizeHandle } from "@/app/lib/sanitize";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/lib/auth-options";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,23 @@ export async function GET(req: NextRequest) {
 
   if (error || !data) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  // Privacy: a private profile (profile_public = false) is only visible to its
+  // owner. Without this server-side check the /p/[handle] "private" screen was
+  // purely cosmetic — anyone could read analysis/bio/links/scores by calling
+  // this API directly. NULL profile_public is treated as public (legacy rows,
+  // consistent with the RLS policy in app/lib/supabase.ts).
+  if (data.profile_public === false) {
+    const session = await getServerSession(authOptions);
+    const requester = sanitizeHandle(
+      (session as import("next-auth").Session | null)?.handle ?? ""
+    );
+    if (requester !== handle) {
+      // Minimal stub: /p/[handle] uses profile_public to show its "This profile
+      // is private." screen — keep that UX, leak nothing else.
+      return NextResponse.json({ handle: data.handle, profile_public: false });
+    }
   }
 
   return NextResponse.json({ ...data, streak: streak ?? null });

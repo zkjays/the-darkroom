@@ -86,15 +86,14 @@ export async function POST(req: NextRequest) {
 
     const db = getServiceSupabase();
 
-    const { data: uploadData, error } = await db.storage
+    const { error } = await db.storage
       .from(BUCKET)
       .upload(filename, buffer, { contentType: file.type });
 
     if (error) {
-      return NextResponse.json(
-        { error: "Upload failed", detail: error.message, supabase_error: JSON.stringify(error) },
-        { status: 500 }
-      );
+      // Log full detail server-side; never echo Supabase internals to the client.
+      console.error("upload: storage error:", JSON.stringify(error));
+      return NextResponse.json({ error: "Upload failed" }, { status: 500 });
     }
 
     const { data: urlData } = db.storage.from(BUCKET).getPublicUrl(filename);
@@ -102,6 +101,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error("Upload error:", JSON.stringify(error));
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }

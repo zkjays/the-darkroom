@@ -259,7 +259,7 @@ export function ProfileView({
                     { url: data.link_x, type: "x" as const },
                     { url: data.link_github, type: "github" as const },
                     { url: data.link_site, type: "site" as const },
-                  ]).filter((l) => l.url).map((l) => (
+                  ]).filter((l) => isSafeHttpUrl(l.url)).map((l) => (
                     <a
                       key={l.type}
                       href={l.url}

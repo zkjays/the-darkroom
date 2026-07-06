@@ -407,6 +407,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
+  // Same length cap + http(s) URL check as POST/PUT — this branch stores proof_value
+  // that is later rendered as <a href> on public pages (stored-XSS defense).
+  const fieldError = validateGoalFields({ proof_value });
+  if (fieldError) return NextResponse.json({ error: fieldError }, { status: 400 });
+
   const db = getServiceSupabase();
   const todayStr = today();
 

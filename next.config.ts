@@ -1,11 +1,5 @@
 import type { NextConfig } from "next";
 
-// Same Twitter/X CDN allowlist used by app/api/proxy-image/route.ts for image hosts.
-const TWITTER_IMAGE_HOSTS = "https://pbs.twimg.com https://abs.twimg.com https://ton.twimg.com";
-
-// Own Supabase Storage bucket (goal-proofs) — public URLs for user-uploaded cover images.
-const SUPABASE_STORAGE_HOST = "https://vwvluwaeiigognkgxbes.supabase.co";
-
 const isDev = process.env.NODE_ENV !== "production";
 
 // Turbopack's dev HMR bootstrap injects its own inline <script> and needs a
@@ -21,7 +15,11 @@ const CSP = [
   "default-src 'self'",
   isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: ${TWITTER_IMAGE_HOSTS} ${SUPABASE_STORAGE_HOST}`,
+  // Work-proof covers come from arbitrary user-submitted links (og:image
+  // auto-fetch) as well as our own Supabase Storage bucket — any single-host
+  // allowlist blanks out most of them. Images can't execute script, so
+  // allowing any https host is low-risk here (unlike script-src).
+  "img-src 'self' data: https:",
   isDev ? "connect-src 'self' ws:" : "connect-src 'self'",
   "font-src 'self' data:",
   "frame-ancestors 'none'",

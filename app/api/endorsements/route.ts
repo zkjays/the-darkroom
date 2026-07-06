@@ -65,6 +65,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cannot endorse your own goal" }, { status: 400 });
   }
 
+  // Daily plug quota — same 3/day rule as the PUT /api/goals endorsement branch.
+  // Without this check the quota was bypassable by plugging via this route instead.
+  if (type === "endorse") {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const { data: todayPlugs } = await db
+      .from("goal_endorsements")
+      .select("id")
+      .eq("endorser_handle", endorser_handle)
+      .eq("type", "endorse")
+      .gte("created_at", todayStr + "T00:00:00.000Z");
+
+    if ((todayPlugs ?? []).length >= 3) {
+      return NextResponse.json({ error: "Daily plug limit reached" }, { status: 429 });
+    }
+  }
+
   // Insert endorsement (UNIQUE on goal_id + endorser_handle will reject duplicates)
   const { data: endorsement, error: insertError } = await db
     .from("goal_endorsements")
