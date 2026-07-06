@@ -19,6 +19,21 @@ function checkRateLimit(key: string, maxRequests: number, windowMs: number): boo
   return true;
 }
 
+// session_id is client-supplied and trivially rotated by an attacker, so it can't be
+// trusted as a rate-limit key on its own — it's still recorded for logging, but the
+// actual throttle below is keyed on the caller's IP (and, when logged in, their handle
+// as an extra layer) since neither of those can be freely regenerated per-request.
+function getClientIp(req: NextRequest): string {
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const first = forwardedFor.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+  return "unknown";
+}
+
 const DARKROOM_SYSTEM_PROMPT = `You are the Darkroom Assistant — the embedded helper for The Darkroom, a builder OS at thedarkroom.xyz.
 
 The Darkroom gives builders a Room Score based on 3 dimensions:
@@ -42,11 +57,13 @@ The 9 archetypes:
 Key features:
 - Daily Refresh: a manual "Refresh scores" button in the profile's action row (next to "Edit profile") — click it yourself to re-analyze your latest X activity (Claude re-scores Social + Builder). Limited to once every 24h per profile; the button shows a countdown when on cooldown.
 - Work Tab: submit proof links — GitHub, deployed projects, articles, prototypes
-- Endorsements: 3 endorsements validates a proof, grows Work Proof score
+- Plugs: 3 plugs validates a proof, grows Work Proof score
 - Darkroom ID: public builder profile at thedarkroom.xyz/p/[handle]
 - Darkroom Card: shareable image card with score and archetype
 
-Tone: direct, sharp, builder-focused. Keep responses under 150 words unless the question genuinely needs more. No fluff.`;
+Tone: direct, sharp, builder-focused. No fluff.
+
+Answer ONLY what was asked. Don't recap features, scoring, or archetypes the user didn't ask about — a question about one thing gets an answer about that thing, not a tour of the product. Default to 1-3 sentences; only go longer if the question is genuinely multi-part or asks for an explanation/comparison.`;
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -67,7 +84,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Empty message" }, { status: 400 });
   }
 
-  if (!checkRateLimit(sessionKey, 20, 60 * 60 * 1000)) {
+  // Resolve the caller's identity up front so it can double as the rate-limit key —
+  // fetched once here and reused below for the exchange log, instead of re-fetching.
+  const session = await getServerSession(authOptions);
+  const authedHandle = session?.handle
+    ? sanitizeHandle(session.handle)
+    : typeof rawHandle === "string" ? sanitizeHandle(rawHandle) : null;
+
+  const clientIp = getClientIp(req);
+  if (!checkRateLimit(`ip:${clientIp}`, 20, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429 });
+  }
+  // Extra layer for logged-in users: caps abuse from a single account even if it
+  // ever shares an IP with many other legitimate callers (NAT / shared network).
+  if (session?.handle && !checkRateLimit(`handle:${authedHandle}`, 20, 60 * 60 * 1000)) {
     return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429 });
   }
 
@@ -101,7 +131,7 @@ export async function POST(req: NextRequest) {
           },
           body: JSON.stringify({
             model,
-            max_tokens: 400,
+            max_tokens: 220,
             system: DARKROOM_SYSTEM_PROMPT,
             messages: [{ role: "user", content: trimmedMessage }],
           }),
@@ -121,14 +151,9 @@ export async function POST(req: NextRequest) {
 
   // Log exchange (non-blocking, fire and forget)
   try {
-    const session = await getServerSession(authOptions);
-    const handle = session?.handle
-      ? sanitizeHandle(session.handle)
-      : typeof rawHandle === "string" ? sanitizeHandle(rawHandle) : null;
-
     const supabase = getServiceSupabase();
     await supabase.from("agent_feedback").insert({
-      handle,
+      handle: authedHandle,
       session_id: sessionKey,
       message: trimmedMessage,
       response,

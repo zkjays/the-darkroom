@@ -12,6 +12,25 @@ interface XPState {
   accent: string;
 }
 
+interface Notification {
+  id: string;
+  endorser_handle: string;
+  endorser_pfp?: string;
+  goal_text: string;
+  goal_id: string;
+  created_at: string;
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
 const XP_ACCENT_COLOR: Record<string, string> = {
   cyan:    "#c9a84c",
   violet:  "#c9a84c",
@@ -32,11 +51,18 @@ export default function Navbar() {
   const [xp, setXP] = useState<XPState | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [unseenCount, setUnseenCount] = useState(0);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -58,6 +84,30 @@ export default function Navbar() {
       })
       .catch(() => {});
   }, [handle]);
+
+  useEffect(() => {
+    if (!handle) { setNotifications([]); return; } // eslint-disable-line react-hooks/set-state-in-effect
+    fetch("/api/notifications", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const notifs = (d.notifications ?? []) as Notification[];
+        setNotifications(notifs);
+        const seenAt = localStorage.getItem(`darkroom_notifs_seen_${handle}`);
+        const unseen = seenAt
+          ? notifs.filter((n) => new Date(n.created_at).getTime() > new Date(seenAt).getTime()).length
+          : notifs.length;
+        setUnseenCount(unseen);
+      })
+      .catch(() => {});
+  }, [handle]);
+
+  const openNotifications = () => {
+    setNotifOpen((v) => !v);
+    if (handle && notifications.length > 0) {
+      localStorage.setItem(`darkroom_notifs_seen_${handle}`, notifications[0].created_at);
+      setUnseenCount(0);
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -110,6 +160,54 @@ export default function Navbar() {
                   style={{ width: `${Math.min(100, (xp.current / xp.cost) * 100)}%`, backgroundColor: XP_ACCENT_COLOR[xp.accent] ?? "#67e8f9" }}
                 />
               </div>
+            </div>
+          )}
+          {handle && (
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={openNotifications}
+                className="relative text-white/60 hover:text-white transition"
+                aria-label="Notifications"
+              >
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                </svg>
+                {unseenCount > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 flex items-center justify-center rounded-full text-[10px] font-bold text-black"
+                    style={{ backgroundColor: "#c9a84c", minWidth: 14, height: 14, padding: "0 3px" }}
+                  >
+                    {unseenCount > 9 ? "9+" : unseenCount}
+                  </span>
+                )}
+              </button>
+              {notifOpen && (
+                <div className="absolute right-0 top-full mt-2 w-72 max-h-96 overflow-y-auto bg-[#0c0c14] border border-white/10 rounded-sm overflow-hidden shadow-xl z-50">
+                  {notifications.length === 0 ? (
+                    <p className="px-4 py-3 text-xs text-slate-500">No plugs yet.</p>
+                  ) : (
+                    notifications.map((n) => (
+                      <Link
+                        key={n.id}
+                        href="/dashboard"
+                        onClick={() => setNotifOpen(false)}
+                        className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-0"
+                      >
+                        {n.endorser_pfp ? (
+                          <img src={n.endorser_pfp} alt={n.endorser_handle} width={24} height={24} className="rounded-full flex-shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-white/[0.06] flex-shrink-0" />
+                        )}
+                        <span className="text-xs text-slate-300 leading-snug">
+                          <span className="font-semibold" style={{ color: "#c9a84c" }}>@{n.endorser_handle}</span>{" "}
+                          plugged your proof {n.goal_text ? `"${n.goal_text.slice(0, 40)}"` : ""}
+                          <span className="block text-slate-500 mt-0.5">{timeAgo(n.created_at)} ago</span>
+                        </span>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           )}
           {handle ? (

@@ -7,6 +7,8 @@ import type { WorkProof, XpResult } from "./_types";
 import { ProofGrid } from "../component/profile/ProofGrid";
 import { SubmitWorkModal } from "./SubmitWorkModal";
 
+const isSafeHttpUrl = (u?: string | null): u is string => !!u && /^https?:\/\//i.test(u);
+
 export function WorkTab({
   handle, goalsPublic, accentClass: _accentClass, accent, onXPGained, onRecalculated,
 }: {
@@ -30,6 +32,7 @@ export function WorkTab({
   const [editDescription, setEditDescription] = useState("");
   const [editImageUrl, setEditImageUrl] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [editUploading, setEditUploading] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -55,6 +58,14 @@ export function WorkTab({
     setEditImageUrl(proof.image_url ?? null);
   };
 
+  // Close the detail modal automatically once its proof is actually deleted
+  // (deletion can be triggered from the grid hover icon or from this modal).
+  useEffect(() => {
+    if (selectedWork && !works.some((w) => w.id === selectedWork.id)) {
+      setSelectedWork(null);
+    }
+  }, [works, selectedWork]);
+
   const deleteProof = async (id: string) => {
     if (deletingId === id) {
       try {
@@ -66,6 +77,28 @@ export function WorkTab({
     } else {
       setDeletingId(id);
       setTimeout(() => setDeletingId(null), 3000);
+    }
+  };
+
+  const uploadEditCover = async (file: File) => {
+    if (!editProof) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File too large (max 5MB)");
+      return;
+    }
+    setEditUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("handle", editProof.handle);
+      const res = await fetch("/api/upload-proof", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      setEditImageUrl(data.url as string);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setEditUploading(false);
     }
   };
 
@@ -192,12 +225,18 @@ export function WorkTab({
                 )}
                 {selectedWork.description && <p className="text-white/55 text-sm leading-relaxed">{selectedWork.description}</p>}
                 {selectedWork.proof_value && (
-                  <a href={selectedWork.proof_value} target="_blank" rel="noopener noreferrer" className="font-[family-name:var(--font-mono)] text-xs text-[#c9a84c]/70 hover:text-[#c9a84c] hover:underline truncate">
-                    {selectedWork.proof_value}
-                  </a>
+                  isSafeHttpUrl(selectedWork.proof_value) ? (
+                    <a href={selectedWork.proof_value} target="_blank" rel="noopener noreferrer" className="font-[family-name:var(--font-mono)] text-xs text-[#c9a84c]/70 hover:text-[#c9a84c] hover:underline truncate">
+                      {selectedWork.proof_value}
+                    </a>
+                  ) : (
+                    <span className="font-[family-name:var(--font-mono)] text-xs text-[#c9a84c]/70 truncate">
+                      {selectedWork.proof_value}
+                    </span>
+                  )
                 )}
                 <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                  <span className="font-[family-name:var(--font-mono)] text-xs text-white/40">{endorsementCount} endorsements</span>
+                  <span className="font-[family-name:var(--font-mono)] text-xs text-white/40">{endorsementCount} plugs</span>
                   <span className="font-[family-name:var(--font-mono)] text-xs" style={{ color: endorsementCount >= 3 ? "#c9a84c" : "#64748b" }}>
                     {endorsementCount >= 6 ? "⬡ Featured" : endorsementCount >= 3 ? "✓ Validated" : `${3 - endorsementCount} more needed`}
                   </span>
@@ -205,12 +244,30 @@ export function WorkTab({
                 <p className="font-[family-name:var(--font-mono)] text-xs text-white/30">
                   Worth {WORK_PROOF_POINTS[selectedWork.proof_type] ?? 3} pts · {endorsementCount >= 3 ? "Full value" : "Half value until validated"}
                 </p>
-                <button
-                  onClick={() => { setSelectedWork(null); setShowOriginal(false); }}
-                  className="mt-2 font-[family-name:var(--font-mono)] text-xs text-white/40 hover:text-white text-center transition-colors"
-                >
-                  Close
-                </button>
+                <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                  <button
+                    onClick={() => { const w = selectedWork; setSelectedWork(null); openEditModal(w); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-wider py-2 rounded-sm border border-white/[0.12] text-white/60 hover:text-white hover:border-white/25 hover:bg-white/[0.04] transition-all"
+                  >
+                    <span>✎</span> Edit
+                  </button>
+                  <button
+                    onClick={() => deleteProof(selectedWork.id)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-wider py-2 rounded-sm border transition-all ${
+                      deletingId === selectedWork.id
+                        ? "border-red-500/50 bg-red-500/15 text-red-300"
+                        : "border-red-500/25 text-red-400/70 hover:text-red-400 hover:bg-red-500/[0.06] hover:border-red-500/40"
+                    }`}
+                  >
+                    <span>✕</span> {deletingId === selectedWork.id ? "Confirm?" : "Delete"}
+                  </button>
+                  <button
+                    onClick={() => { setSelectedWork(null); setShowOriginal(false); }}
+                    className="flex-1 flex items-center justify-center font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-wider py-2 rounded-sm border border-white/[0.08] text-white/40 hover:text-white hover:border-white/20 transition-all"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -237,11 +294,17 @@ export function WorkTab({
               </div>
               <h3 className="text-white font-bold text-base">{selectedWork.original_goal_text || selectedWork.goal_text}</h3>
               {selectedWork.original_description && <p className="text-white/55 text-sm leading-relaxed">{selectedWork.original_description}</p>}
-              <a href={selectedWork.original_proof_value} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-amber-400 hover:underline truncate">
-                {selectedWork.original_proof_value}
-              </a>
+              {isSafeHttpUrl(selectedWork.original_proof_value) ? (
+                <a href={selectedWork.original_proof_value} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-amber-400 hover:underline truncate">
+                  {selectedWork.original_proof_value}
+                </a>
+              ) : (
+                <span className="text-xs font-mono text-amber-400 truncate">
+                  {selectedWork.original_proof_value}
+                </span>
+              )}
               <p className="text-[10px] text-white/30 font-mono border-t border-white/5 pt-3">
-                Submitted on {new Date(selectedWork.created_at).toLocaleDateString()} · Modified after endorsements
+                Submitted on {new Date(selectedWork.created_at).toLocaleDateString()} · Modified after plugs
               </p>
             </div>
           </div>
@@ -287,7 +350,7 @@ export function WorkTab({
 
                     <div>
                       <label className="block font-[family-name:var(--font-mono)] text-[10px] text-white/40 uppercase tracking-widest mb-2">
-                        Link{endorsementCount > 0 && <span className="ml-2 text-white/40 text-xs font-normal">(locked — has endorsements)</span>}
+                        Link{endorsementCount > 0 && <span className="ml-2 text-white/40 text-xs font-normal">(locked — has plugs)</span>}
                       </label>
                       <input
                         type="url"
@@ -297,7 +360,7 @@ export function WorkTab({
                         className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none focus:border-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                       {urlChanged && endorsementCount === 0 && (
-                        <p className="text-amber-400 text-xs font-mono mt-1">⚠ Changing the URL will reset your endorsements to 0</p>
+                        <p className="text-amber-400 text-xs font-mono mt-1">⚠ Changing the URL will reset your plugs to 0</p>
                       )}
                     </div>
 
@@ -358,15 +421,14 @@ export function WorkTab({
                           type="file"
                           accept="image/*"
                           className="hidden"
+                          disabled={editUploading}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (!file || file.size > 2 * 1024 * 1024) return;
-                            const reader = new FileReader();
-                            reader.onload = () => setEditImageUrl(reader.result as string);
-                            reader.readAsDataURL(file);
+                            if (!file) return;
+                            uploadEditCover(file);
                           }}
                         />
-                        ↑ Upload image
+                        {editUploading ? "Uploading…" : "↑ Upload image"}
                       </label>
                     )}
 

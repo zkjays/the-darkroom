@@ -1,7 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
+import dns from "node:dns/promises";
+import net from "node:net";
 
-// Block private/internal IP ranges and known cloud metadata endpoints
-function isSafeUrl(rawUrl: string): boolean {
+const fetchOgRateLimit = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  const entry = fetchOgRateLimit.get(key);
+  if (!entry || now > entry.resetAt) {
+    fetchOgRateLimit.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= maxRequests) return false;
+  entry.count++;
+  return true;
+}
+
+function getClientKey(req: NextRequest): string {
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0].trim();
+  return req.headers.get("x-real-ip") ?? "unknown";
+}
+
+// Private/loopback/link-local ranges to block, for both literal IPs in the URL
+// and IPs a hostname actually resolves to (protects against DNS rebinding).
+const blockedRanges = new net.BlockList();
+blockedRanges.addSubnet("10.0.0.0", 8, "ipv4");
+blockedRanges.addSubnet("127.0.0.0", 8, "ipv4");
+blockedRanges.addSubnet("172.16.0.0", 12, "ipv4");
+blockedRanges.addSubnet("192.168.0.0", 16, "ipv4");
+blockedRanges.addSubnet("169.254.0.0", 16, "ipv4"); // cloud metadata (AWS/GCP/Azure)
+blockedRanges.addSubnet("0.0.0.0", 8, "ipv4");
+blockedRanges.addSubnet("::1", 128, "ipv6"); // loopback
+blockedRanges.addSubnet("fc00::", 7, "ipv6"); // unique-local
+blockedRanges.addSubnet("fe80::", 10, "ipv6"); // link-local
+
+function isBlockedAddress(address: string): boolean {
+  const family = net.isIP(address);
+  if (family === 4) return blockedRanges.check(address, "ipv4");
+  if (family === 6) {
+    if (blockedRanges.check(address, "ipv6")) return true;
+    // IPv4-mapped IPv6 (e.g. ::ffff:169.254.169.254) — check the embedded IPv4 too
+    const mapped = address.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i);
+    if (mapped) return blockedRanges.check(mapped[1], "ipv4");
+    return false;
+  }
+  // Not a recognizable IP literal — treat as unresolved/unsafe.
+  return true;
+}
+
+// Block private/internal IP ranges and known cloud metadata endpoints.
+// Resolves the hostname (DNS or literal) and validates the ACTUAL resolved
+// address(es), not just a pattern match on the URL string — this closes the
+// IPv6-literal gap, alternate IPv4 encodings (decimal/octal/hex), and
+// DNS-rebinding (a public hostname that resolves to an internal IP).
+async function isSafeUrl(rawUrl: string): Promise<boolean> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -18,32 +71,30 @@ function isSafeUrl(rawUrl: string): boolean {
   const blockedHostnames = ["localhost", "metadata.google.internal"];
   if (blockedHostnames.includes(hostname)) return false;
 
-  // Block IP-based URLs (private + metadata ranges)
-  const ipv4 = hostname.match(
-    /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
-  );
-  if (ipv4) {
-    const [, a, b] = ipv4.map(Number);
-    // 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, 169.254.x.x (cloud metadata)
-    if (
-      a === 10 ||
-      a === 127 ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 169 && b === 254)
-    ) {
-      return false;
-    }
-  }
+  // Strip IPv6 literal brackets, e.g. "[::1]" -> "::1"
+  const bareHost = hostname.startsWith("[") && hostname.endsWith("]")
+    ? hostname.slice(1, -1)
+    : hostname;
 
-  return true;
+  try {
+    const results = await dns.lookup(bareHost, { all: true, verbatim: true });
+    if (results.length === 0) return false;
+    return results.every((r) => !isBlockedAddress(r.address));
+  } catch {
+    // Hostname didn't resolve (typo, doesn't exist, etc.) — treat as unsafe.
+    return false;
+  }
 }
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get("url");
   if (!url) return NextResponse.json({});
 
-  if (!isSafeUrl(url)) {
+  if (!checkRateLimit(getClientKey(req), 30, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: "Rate limit exceeded. Try again later." }, { status: 429 });
+  }
+
+  if (!(await isSafeUrl(url))) {
     return NextResponse.json({}, { status: 400 });
   }
 

@@ -8,6 +8,8 @@ import type { WorkProof, XpResult } from "./_types";
 const TOTAL_STEPS = 6;
 const STEP_LABELS = ["Category", "Link", "Title", "Cover", "Details", "Review"];
 
+const isSafeHttpUrl = (u?: string | null): u is string => !!u && /^https?:\/\//i.test(u);
+
 // "Create post" style modal — step-by-step wizard.
 // Link-first: pasting the proof URL auto-fills title + cover (fetchOG),
 // so the later steps are mostly confirmation. Editorial-dark styling.
@@ -34,6 +36,7 @@ export function SubmitWorkModal({
   const [description, setDescription] = useState("");
   const [ogImage, setOgImage] = useState<string | null>(null);
   const [ogLoading, setOgLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [isPublic, setIsPublic] = useState(goalsPublic);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,6 +50,27 @@ export function SubmitWorkModal({
       if (data.title && !title) setTitle(data.title.slice(0, 60));
     } catch { /* ignore */ } finally {
       setOgLoading(false);
+    }
+  };
+
+  const uploadCover = async (file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File too large (max 5MB)");
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("handle", handle);
+      const res = await fetch("/api/upload-proof", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      setOgImage(data.url as string);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -257,17 +281,16 @@ export function SubmitWorkModal({
                     type="file"
                     accept="image/*"
                     className="hidden"
+                    disabled={uploading}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (!file || file.size > 5 * 1024 * 1024) return;
-                      const reader = new FileReader();
-                      reader.onload = () => setOgImage(reader.result as string);
-                      reader.readAsDataURL(file);
+                      if (!file) return;
+                      uploadCover(file);
                     }}
                   />
                   <span className="text-2xl opacity-20">↑</span>
                   <div className="text-center">
-                    <p className="font-[family-name:var(--font-mono)] text-xs text-white/55">Drop your cover</p>
+                    <p className="font-[family-name:var(--font-mono)] text-xs text-white/55">{uploading ? "Uploading…" : "Drop your cover"}</p>
                     <p className="font-[family-name:var(--font-mono)] text-[9px] text-white/30 mt-1">1080 × 1080 · square · max 5MB</p>
                   </div>
                 </label>
@@ -316,7 +339,11 @@ export function SubmitWorkModal({
                 <div className="min-w-0 flex flex-col gap-1">
                   <p className="text-sm text-white font-medium truncate">{title || "Untitled"}</p>
                   <p className="font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-widest" style={{ color: accentHex }}>{proofType}{dateBuilt ? ` · ${dateBuilt}` : ""}</p>
-                  <a href={url} target="_blank" rel="noreferrer" className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 truncate hover:text-white/70 transition-colors">{url}</a>
+                  {isSafeHttpUrl(url) ? (
+                    <a href={url} target="_blank" rel="noreferrer" className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 truncate hover:text-white/70 transition-colors">{url}</a>
+                  ) : (
+                    <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 truncate">{url}</span>
+                  )}
                   {description && <p className="text-xs text-white/55 line-clamp-2 mt-1">{description}</p>}
                 </div>
               </div>

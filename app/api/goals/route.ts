@@ -54,6 +54,40 @@ function sessionHandle(session: object | null): string | undefined {
   return (session as import("next-auth").Session | null)?.handle;
 }
 
+// Reject anything that isn't an http(s) URL — proof_value/image_url are later
+// rendered as raw <a href> / <img src> on public pages (stored-XSS defense).
+const HTTP_URL_RE = /^https?:\/\//i;
+
+// image_url capped higher than proof_value — og:image URLs from signed CDNs
+// routinely exceed 500 chars, unlike canonical project links.
+const FIELD_LIMITS = { goal_text: 200, description: 2000, proof_value: 500, image_url: 2000 } as const;
+
+/**
+ * Validate user-supplied goal fields: length caps + http(s) URL scheme for URLs.
+ * Only checks fields that are present (non-undefined/null) so it works for both
+ * create (POST) and partial edit (PUT). Returns an error message, or null if valid.
+ * Rejects rather than truncates — proof-of-work content, silent data loss is worse UX.
+ */
+function validateGoalFields(fields: {
+  goal_text?: unknown; description?: unknown; proof_value?: unknown; image_url?: unknown;
+}): string | null {
+  const f = fields as Record<string, unknown>;
+  for (const [key, max] of Object.entries(FIELD_LIMITS)) {
+    const val = f[key];
+    if (val === undefined || val === null) continue;
+    if (typeof val !== "string") return `${key} must be a string`;
+    if (val.length > max) return `${key} exceeds ${max} characters`;
+  }
+  for (const key of ["proof_value", "image_url"] as const) {
+    const val = f[key];
+    if (val === undefined || val === null || val === "") continue;
+    if (typeof val === "string" && !HTTP_URL_RE.test(val)) {
+      return `${key} must be a valid http(s) URL`;
+    }
+  }
+  return null;
+}
+
 // GET /api/goals?handle=X                    — fetch today's goals for handle
 // GET /api/goals?handle=X&all=true           — fetch all goals (no date filter), newest first
 // GET /api/goals?handle=X&completed=true     — filter to completed only
@@ -87,6 +121,14 @@ export async function GET(req: NextRequest) {
 
   if (!handle) return NextResponse.json({ error: "Missing handle" }, { status: 400 });
 
+  // Privacy: only the authenticated owner may see their private goals. Anyone else
+  // (anonymous or a different user) is forced to is_public=true regardless of the
+  // public_only query param — the caller must not be able to opt out of the filter
+  // when reading someone else's data (IDOR).
+  const session = await getServerSession(authOptions);
+  const requesterHandle = sanitizeHandle(sessionHandle(session) ?? "");
+  const isOwner = requesterHandle !== "" && requesterHandle === handle;
+
   let query = db
     .from("daily_goals")
     .select("*")
@@ -94,7 +136,7 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: allMode ? false : true });
 
   if (!allMode) query = query.eq("goal_date", today());
-  if (publicOnly) query = query.eq("is_public", true);
+  if (publicOnly || !isOwner) query = query.eq("is_public", true);
   if (completedOnly) query = query.eq("status", "completed");
 
   const { data, error } = await query;
@@ -139,7 +181,10 @@ export async function POST(req: NextRequest) {
   const {
     handle: rawHandle, goal_text, proof_type, proof_value,
     target_stat, is_public, template_id,
-    image_url, description, completed_at, xp_reward,
+    image_url, description, completed_at,
+    // NOTE: client-supplied xp_reward is intentionally NOT destructured — the reward
+    // is computed server-side from proof_type below. Trusting it let any user inflate
+    // their leaderboard score arbitrarily.
   } = body;
   const handle = sanitizeHandle(rawHandle ?? "");
 
@@ -150,6 +195,10 @@ export async function POST(req: NextRequest) {
   if (sessionHandle(session) !== handle) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Length caps + http(s) URL validation for user content (stored-XSS + abuse defense).
+  const fieldError = validateGoalFields({ goal_text, description, proof_value, image_url });
+  if (fieldError) return NextResponse.json({ error: fieldError }, { status: 400 });
 
   const db = getServiceSupabase();
 
@@ -166,8 +215,32 @@ export async function POST(req: NextRequest) {
 
   const isDirectComplete = !!proof_value;
 
-  // Enforce 3-goal daily limit only for pending goals (not direct-complete Work submissions)
-  if (!isDirectComplete) {
+  // Server-computed reward — never trust client input. Mirrors the PROOF_POINTS table
+  // in app/api/endorsements: base points per proof_type (Project/OSS 8, Article/Video/
+  // Design 5, Thread/Other 3, plus current Ship/Code/Client 8, Release/Publish 5, Post 3).
+  const computedXpReward = PROOF_POINTS[proof_type] ?? 3;
+  // Direct-complete Work submissions always feed the work_proof stat, regardless of what
+  // target_stat the client sent. Pending goals keep their (non-work) stat category.
+  const resolvedTargetStat: string = isDirectComplete ? "work_proof" : (target_stat ?? "work_proof");
+
+  // Daily submission caps — prevent leaderboard spam.
+  if (isDirectComplete) {
+    // Work proofs previously had NO cap, which (combined with the old client-controlled
+    // xp_reward) allowed unlimited full-score submissions per day. Give this path its own,
+    // more generous cap so a prolific builder isn't blocked while the hole stays closed.
+    const WORK_DAILY_LIMIT = 10;
+    const { count } = await db
+      .from("daily_goals")
+      .select("*", { count: "exact", head: true })
+      .eq("handle", handle)
+      .eq("goal_date", today())
+      .not("proof_value", "is", null);
+
+    if ((count ?? 0) >= WORK_DAILY_LIMIT) {
+      return NextResponse.json({ error: "max_work_proofs_reached" }, { status: 400 });
+    }
+  } else {
+    // Enforce 3-goal daily limit for pending goals.
     const { count } = await db
       .from("daily_goals")
       .select("*", { count: "exact", head: true })
@@ -186,10 +259,10 @@ export async function POST(req: NextRequest) {
     goal_text,
     proof_type,
     proof_value: proof_value ?? null,
-    target_stat: target_stat ?? "work_proof",
+    target_stat: resolvedTargetStat,
     status: isDirectComplete ? "completed" : "active",
     completed_at: isDirectComplete ? (completed_at ?? now) : null,
-    xp_reward: xp_reward ?? 5,
+    xp_reward: computedXpReward,
     goal_date: today(),
     is_public: is_public ?? true,
     template_id: template_id ?? null,
@@ -215,14 +288,14 @@ export async function POST(req: NextRequest) {
 
   // If direct-complete (Work submission), run XP logic + update work_proof immediately
   if (isDirectComplete && goal) {
-    const xpToAdd = xp_reward ?? 5;
-    const xpResult = await convertXPToPoints(db, handle, target_stat, xpToAdd);
+    const xpToAdd = computedXpReward;
+    const xpResult = await convertXPToPoints(db, handle, resolvedTargetStat, xpToAdd);
     try {
       await db.from("xp_earnings").insert({
         handle,
         source: "goal_complete",
         amount: xpToAdd,
-        meta: { goal_id: goal.id, stat: target_stat, points_gained: xpResult.points_gained },
+        meta: { goal_id: goal.id, stat: resolvedTargetStat, points_gained: xpResult.points_gained },
       });
     } catch (e) {
       console.error("xp_earnings insert failed:", e);
@@ -580,6 +653,10 @@ export async function PUT(req: NextRequest) {
   const { id, goal_text, description, image_url, proof_type, completed_at, proof_value } = body;
 
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  // Length caps + http(s) URL validation on edited content (stored-XSS + abuse defense).
+  const fieldError = validateGoalFields({ goal_text, description, proof_value, image_url });
+  if (fieldError) return NextResponse.json({ error: fieldError }, { status: 400 });
 
   const db = getServiceSupabase();
 

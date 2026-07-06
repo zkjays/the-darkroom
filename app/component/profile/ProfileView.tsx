@@ -9,6 +9,8 @@ import { ProofGrid } from "./ProofGrid";
 
 const REFERRALS_NEEDED = 25;
 
+const isSafeHttpUrl = (u?: string | null): u is string => !!u && /^https?:\/\//i.test(u);
+
 function PfpPlaceholder({ handle, size }: { handle: string; size: number }) {
   return (
     <div
@@ -732,12 +734,18 @@ export function ProfileView({
                 <h3 className="text-white font-bold text-lg">{selectedProof.goal_text}</h3>
                 {selectedProof.description && <p className="text-white/55 text-sm leading-relaxed">{selectedProof.description}</p>}
                 {selectedProof.proof_value && (
-                  <a href={selectedProof.proof_value} target="_blank" rel="noopener noreferrer" className="font-[family-name:var(--font-mono)] text-xs text-[#c9a84c]/70 hover:text-[#c9a84c] hover:underline truncate">
-                    {selectedProof.proof_value}
-                  </a>
+                  isSafeHttpUrl(selectedProof.proof_value) ? (
+                    <a href={selectedProof.proof_value} target="_blank" rel="noopener noreferrer" className="font-[family-name:var(--font-mono)] text-xs text-[#c9a84c]/70 hover:text-[#c9a84c] hover:underline truncate">
+                      {selectedProof.proof_value}
+                    </a>
+                  ) : (
+                    <span className="font-[family-name:var(--font-mono)] text-xs text-[#c9a84c]/70 truncate">
+                      {selectedProof.proof_value}
+                    </span>
+                  )
                 )}
                 <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                  <span className="font-[family-name:var(--font-mono)] text-xs text-white/40">{ec} endorsement{ec !== 1 ? "s" : ""}</span>
+                  <span className="font-[family-name:var(--font-mono)] text-xs text-white/40">{ec} plug{ec !== 1 ? "s" : ""}</span>
                   <span className="font-[family-name:var(--font-mono)] text-xs" style={{ color: ec >= 3 ? "#c9a84c" : "#64748b" }}>
                     {ec >= 6 ? "⬡ Featured" : ec >= 3 ? "✓ Validated" : `${Math.max(0, 3 - ec)} more needed`}
                   </span>
@@ -747,18 +755,18 @@ export function ProfileView({
                 </p>
                 {canEndorse && (
                   endorsedIds.has(selectedProof.id) ? (
-                    <div className="mt-1 font-[family-name:var(--font-mono)] text-xs text-emerald-400 text-center">✓ Endorsed</div>
+                    <div className="mt-1 font-[family-name:var(--font-mono)] text-xs text-emerald-400 text-center">✓ Plugged</div>
                   ) : (
                     <button
                       onClick={() => endorse(selectedProof.id)}
                       className="mt-1 w-full font-[family-name:var(--font-mono)] text-xs py-2 rounded-sm border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors"
                     >
-                      Endorse this proof
+                      Plug this proof
                     </button>
                   )
                 )}
                 {!owner && !sanitizedCurrent && (
-                  <p className="mt-1 font-[family-name:var(--font-mono)] text-[10px] text-slate-600 text-center">Login to endorse</p>
+                  <p className="mt-1 font-[family-name:var(--font-mono)] text-[10px] text-slate-600 text-center">Login to plug</p>
                 )}
                 <button
                   onClick={() => setSelectedProof(null)}

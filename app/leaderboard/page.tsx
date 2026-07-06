@@ -122,19 +122,19 @@ function BuilderRow({
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-600 uppercase">S</span>
+            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-400 uppercase">S</span>
             <ScoreBar value={b.social_proof} color="rgba(255,255,255,0.35)" />
-            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-500">{b.social_proof}</span>
+            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-400">{b.social_proof}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-600 uppercase">B</span>
+            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-400 uppercase">B</span>
             <ScoreBar value={b.builder_proof} color="rgba(255,255,255,0.35)" />
-            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-500">{b.builder_proof}</span>
+            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-400">{b.builder_proof}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-600 uppercase">W</span>
+            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-400 uppercase">W</span>
             <ScoreBar value={b.work_proof} max={50} color="rgba(201,168,76,0.6)" />
-            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-500">{b.work_proof}</span>
+            <span className="font-[family-name:var(--font-mono)] text-[9px] text-slate-400">{b.work_proof}</span>
           </div>
         </div>
       </div>
@@ -144,7 +144,7 @@ function BuilderRow({
         <span className="font-bold text-xl leading-none" style={{ color: isMe ? "#c9a84c" : isTop3 ? "#c9a84c" : "rgba(255,255,255,0.8)" }}>
           {b.total_score ?? 0}
         </span>
-        <span className="text-[9px] font-[family-name:var(--font-mono)] text-slate-600 tracking-widest">PTS</span>
+        <span className="text-[9px] font-[family-name:var(--font-mono)] text-slate-500 tracking-widest">PTS</span>
       </div>
     </a>
   );
@@ -252,10 +252,10 @@ function ProofRow({
           <span className={`font-[family-name:var(--font-mono)] text-[10px] truncate ${isMe ? "text-[#c9a84c]" : "text-slate-500"}`}>
             @{p.handle}
           </span>
-          <span className="font-[family-name:var(--font-mono)] text-[9px] px-1.5 py-0.5 rounded-sm border border-white/10 text-slate-500 uppercase tracking-wider flex-shrink-0">
+          <span className="font-[family-name:var(--font-mono)] text-[9px] px-1.5 py-0.5 rounded-sm border border-white/10 text-slate-400 uppercase tracking-wider flex-shrink-0">
             {p.proof_type}
           </span>
-          <span className="font-[family-name:var(--font-mono)] text-[9px] uppercase tracking-wider flex-shrink-0" style={{ color: t.color, opacity: 0.8 }}>
+          <span className="font-[family-name:var(--font-mono)] text-[9px] uppercase tracking-wider flex-shrink-0" style={{ color: t.color, opacity: 1 }}>
             {p.tier_label}
           </span>
         </div>
@@ -271,7 +271,7 @@ function ProofRow({
         <span className="font-bold text-xl leading-none" style={{ color: t.glow > 0 ? t.color : "rgba(255,255,255,0.5)" }}>
           {p.plugs}
         </span>
-        <span className="text-[9px] font-[family-name:var(--font-mono)] text-slate-600 tracking-widest">
+        <span className="text-[9px] font-[family-name:var(--font-mono)] text-slate-500 tracking-widest">
           PLUG{p.plugs !== 1 ? "S" : ""}
         </span>
       </div>
@@ -296,7 +296,7 @@ function ProofRow({
   );
 }
 
-export default function Leaderboard() {
+export default function Roomboard() {
   const { data: session, status } = useSession();
   const [view, setView] = useState<"builders" | "proofs">("builders");
   const [builders, setBuilders] = useState<Builder[]>([]);
@@ -399,18 +399,15 @@ export default function Leaderboard() {
     <div className="min-h-screen bg-[#050508] text-white font-[family-name:var(--font-outfit)]">
       <Navbar />
 
-      <main className="mx-auto px-6 py-10 pt-24" style={{ maxWidth: 680 }}>
+      <main className="mx-auto px-6 py-10 pt-24" style={{ maxWidth: 960 }}>
 
         {/* Header */}
         <div className="mb-10">
-          <p className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.25em] text-slate-600 uppercase mb-2">
-            The Darkroom
-          </p>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Room Score</h1>
-          <p className="font-[family-name:var(--font-mono)] text-xs text-slate-500 mt-2">
+          <h1 className="text-3xl font-bold text-white tracking-tight">Roomboard</h1>
+          <p className="font-[family-name:var(--font-mono)] text-xs text-slate-400 mt-2">
             {view === "builders" ? "builders ranked by proof — not promises" : "proofs ranked by plugs — the room decides"}
           </p>
-          <div className="mt-4 h-[1px] w-12" style={{ background: "linear-gradient(90deg, rgba(201,168,76,0.6), transparent)" }} />
+          <div className="mt-4 h-[2px] w-16" style={{ background: "linear-gradient(90deg, rgba(201,168,76,0.9), transparent)" }} />
         </div>
 
         {checkingProof || status === "loading" ? (
@@ -425,7 +422,7 @@ export default function Leaderboard() {
                 ◈ proof-gated
               </p>
               <p className="text-white/70 text-lg font-medium leading-snug max-w-sm">
-                Submit your first proof to unlock the leaderboard.
+                Submit your first proof to unlock the roomboard.
               </p>
               <p className="font-[family-name:var(--font-mono)] text-xs text-white/25 max-w-xs leading-relaxed">
                 Reserved for builders who have shipped at least one validated proof.
@@ -508,7 +505,7 @@ export default function Leaderboard() {
                   {/* Your rank — shown separately only if not already visible in list */}
                   {myBuilder && myRank >= 0 && (
                     <div className="mt-6 pt-5 border-t border-white/[0.06]">
-                      <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-600 uppercase tracking-widest mb-2">
+                      <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-400 uppercase tracking-widest mb-2">
                         your position
                       </p>
                       <BuilderRow b={myBuilder} rank={myRank + 1} isMe={true} />
@@ -516,7 +513,7 @@ export default function Leaderboard() {
                   )}
 
                   {/* Footer count */}
-                  <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-700 text-center mt-6">
+                  <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 text-center mt-6">
                     {builders.length} builder{builders.length !== 1 ? "s" : ""} · proof-verified
                   </p>
                 </div>
@@ -562,7 +559,7 @@ export default function Leaderboard() {
                         onPlug={handlePlug}
                       />
                     ))}
-                    <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-700 text-center mt-6">
+                    <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500 text-center mt-6">
                       {proofs.length} proof{proofs.length !== 1 ? "s" : ""} · plug-ranked
                     </p>
                   </div>

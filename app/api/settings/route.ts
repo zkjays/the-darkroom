@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth-options";
+import { sanitizeHandle } from "@/app/lib/sanitize";
 
 export async function GET(req: NextRequest) {
   const handle = req.nextUrl.searchParams.get("handle");
@@ -15,6 +16,29 @@ export async function GET(req: NextRequest) {
     .single();
 
   if (error || !data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Only the owner may read their private settings (needed to populate their own
+  // edit form, including when profile_public is false). Anyone else only gets
+  // bio/social links if the profile is public — those fields are otherwise
+  // private and must not be exposed via this endpoint (security audit finding).
+  const session = await getServerSession(authOptions);
+  const sessionHandle = (session as { handle?: string } | null)?.handle;
+  const isOwner = !!sessionHandle && sanitizeHandle(sessionHandle) === sanitizeHandle(handle);
+  const isPublic = data.profile_public ?? false;
+
+  if (!isOwner && !isPublic) {
+    return NextResponse.json({
+      profile_public: false,
+      goals_public: data.goals_public ?? false,
+      theme_accent: data.theme_accent ?? "cyan",
+      open_to_opportunities: data.open_to_opportunities ?? false,
+      bio: "",
+      link_x: "",
+      link_github: "",
+      link_site: "",
+    });
+  }
+
   return NextResponse.json({
     profile_public: data.profile_public ?? false,
     goals_public: data.goals_public ?? false,

@@ -3,6 +3,20 @@ import { getServiceSupabase } from "@/app/lib/supabase";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth-options";
 
+const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  const entry = uploadRateLimit.get(key);
+  if (!entry || now > entry.resetAt) {
+    uploadRateLimit.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= maxRequests) return false;
+  entry.count++;
+  return true;
+}
+
 const ALLOWED_MIME_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -42,6 +56,12 @@ export async function POST(req: NextRequest) {
 
     const sessionHandle = session.handle;
     if (sessionHandle !== handle) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Storage/bandwidth cost abuse: cap uploads per authenticated handle. This is a
+    // stronger key than IP since the route already requires auth.
+    if (!checkRateLimit(handle, 15, 60 * 60 * 1000)) {
+      return NextResponse.json({ error: "Too many uploads. Try again later." }, { status: 429 });
+    }
 
     if (file.size > MAX_BYTES) {
       return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 413 });
