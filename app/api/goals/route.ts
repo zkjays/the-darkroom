@@ -655,7 +655,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // ── EDIT BRANCH ─────────────────────────────────────────────────────────
-  const { id, goal_text, description, image_url, proof_type, completed_at, proof_value } = body;
+  const { id, goal_text, description, image_url, proof_type, completed_at, proof_value, is_public } = body;
 
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
@@ -690,6 +690,7 @@ export async function PUT(req: NextRequest) {
   if (image_url !== undefined) updates.image_url = image_url;
   if (proof_type !== undefined) updates.proof_type = proof_type;
   if (completed_at !== undefined) updates.completed_at = completed_at;
+  if (is_public !== undefined) updates.is_public = is_public;
 
   // URL may only change when nobody has endorsed yet; never touch original_proof_value
   if (proof_value !== undefined && proof_value !== goal.proof_value && (goal.endorsement_count ?? 0) === 0) {

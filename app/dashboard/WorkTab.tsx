@@ -31,6 +31,7 @@ export function WorkTab({
   const [editCompletedAt, setEditCompletedAt] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editImageUrl, setEditImageUrl] = useState<string | null>(null);
+  const [editIsPublic, setEditIsPublic] = useState(true);
   const [editSaving, setEditSaving] = useState(false);
   const [editUploading, setEditUploading] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
@@ -56,6 +57,7 @@ export function WorkTab({
     setEditCompletedAt(proof.completed_at ? proof.completed_at.split("T")[0] : "");
     setEditDescription(proof.description ?? "");
     setEditImageUrl(proof.image_url ?? null);
+    setEditIsPublic(proof.is_public ?? true);
   };
 
   // Close the detail modal automatically once its proof is actually deleted
@@ -117,6 +119,7 @@ export function WorkTab({
           proof_type: editProofType,
           completed_at: editCompletedAt || null,
           proof_value: editUrl.trim() || null,
+          is_public: editIsPublic,
         }),
       });
       const data = await res.json();
@@ -431,6 +434,19 @@ export function WorkTab({
                         {editUploading ? "Uploading…" : "↑ Upload image"}
                       </label>
                     )}
+
+                    <div className="flex items-center justify-between border-t border-white/[0.06] pt-4">
+                      <span className="font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-widest text-white/55">Public</span>
+                      <button
+                        onClick={() => setEditIsPublic((v) => !v)}
+                        aria-label={editIsPublic ? "Make proof private" : "Make proof public"}
+                        className={`flex-shrink-0 w-10 h-5 rounded-sm border transition-all duration-200 relative ${
+                          editIsPublic ? "border-[#c9a84c]/50 bg-[#c9a84c]/10" : "border-white/10 bg-white/[0.02]"
+                        }`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-none transition-all duration-200 ${editIsPublic ? "left-[22px] bg-[#c9a84c]" : "left-0.5 bg-white/30"}`} />
+                      </button>
+                    </div>
 
                     <div className="flex items-center justify-between pt-2">
                       <button onClick={() => setEditProof(null)} className="font-[family-name:var(--font-mono)] text-xs text-white/40 hover:text-white/75 transition-colors">Cancel</button>
