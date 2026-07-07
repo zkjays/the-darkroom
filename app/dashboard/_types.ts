@@ -69,6 +69,16 @@ export type XpResult = {
   new_stat_xp: number;
 };
 
+// DarkCircle — a builder's personal watchlist of other handles. Private to its
+// owner; enriched with a light snapshot of the watched profile for display.
+export interface DarkCircleEntry {
+  watched_handle: string;
+  added_at: string;
+  profile_image_url?: string;
+  archetype?: string;
+  total_score?: number;
+}
+
 export const STATS = [
   { key: "focus",       label: "FOCUS",       color: "#60A5FA", fallback: "dedication" },
   { key: "consistency", label: "CONSISTENCY", color: "#C084FC", fallback: "consistency" },
