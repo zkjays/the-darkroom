@@ -186,6 +186,26 @@ export default function DarkCirclePage() {
           </div>
         ) : (
           <>
+            <div className="flex items-center gap-2 w-full max-w-sm mb-10">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addToCircle();
+                }}
+                placeholder="@handle to watch"
+                className="flex-1 bg-white/[0.03] border border-white/10 rounded-sm px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors"
+              />
+              <button
+                onClick={addToCircle}
+                disabled={adding || !input.trim()}
+                className="font-[family-name:var(--font-mono)] text-[11px] tracking-widest uppercase text-slate-300 hover:text-white border border-white/10 hover:border-white/25 rounded-sm px-4 py-2 transition-all disabled:opacity-40"
+              >
+                {adding ? "Adding…" : "Add"}
+              </button>
+            </div>
+            {msg && <p className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 -mt-8 mb-8">{msg}</p>}
+
             <div className="relative mb-10" style={{ width: ORBIT_SIZE, height: ORBIT_SIZE, maxWidth: "100%" }}>
               <svg
                 className="absolute inset-0 pointer-events-none"
@@ -258,26 +278,6 @@ export default function DarkCirclePage() {
                 );
               })}
             </div>
-
-            <div className="flex items-center gap-2 w-full max-w-sm">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") addToCircle();
-                }}
-                placeholder="@handle to watch"
-                className="flex-1 bg-white/[0.03] border border-white/10 rounded-sm px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors"
-              />
-              <button
-                onClick={addToCircle}
-                disabled={adding || !input.trim()}
-                className="font-[family-name:var(--font-mono)] text-[11px] tracking-widest uppercase text-slate-300 hover:text-white border border-white/10 hover:border-white/25 rounded-sm px-4 py-2 transition-all disabled:opacity-40"
-              >
-                {adding ? "Adding…" : "Add"}
-              </button>
-            </div>
-            {msg && <p className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 mt-3">{msg}</p>}
           </>
         )}
       </main>
