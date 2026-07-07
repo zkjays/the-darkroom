@@ -1,15 +1,18 @@
 import Navbar from "@/app/component/landing/Navbar";
 import Hero from "@/app/component/landing/Hero";
-import HeroProductPreview from "@/app/component/landing/HeroProductPreview";
 import Footer from "@/app/component/landing/Footer";
 import Particles from "@/app/component/landing/Particles";
 import MouseGlow from "@/app/component/landing/MouseGlow";
-import CountdownBanner from "@/app/component/landing/CountdownBanner";
+import ProblemStatement from "@/app/component/landing/sections/ProblemStatement";
+import ScoreExplainer from "@/app/component/landing/sections/ScoreExplainer";
+import ArchetypesShowcase from "@/app/component/landing/sections/ArchetypesShowcase";
+import WorkProofSection from "@/app/component/landing/sections/WorkProofSection";
+import IdentitySection from "@/app/component/landing/sections/IdentitySection";
+import FinalCTA from "@/app/component/landing/sections/FinalCTA";
 
 export default function Home() {
   return (
     <main className="min-h-screen">
-      <CountdownBanner />
       <div className="relative overflow-hidden bg-[#050508]">
 
         {/* === DEPTH LAYER: Grid === */}
@@ -31,7 +34,12 @@ export default function Home() {
         <div className="relative z-10">
           <Navbar />
           <Hero />
-          <HeroProductPreview />
+          <ProblemStatement />
+          <ScoreExplainer />
+          <ArchetypesShowcase />
+          <WorkProofSection />
+          <IdentitySection />
+          <FinalCTA />
           <Footer />
         </div>
       </div>

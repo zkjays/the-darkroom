@@ -11,7 +11,7 @@ export default function Hero() {
       <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center gap-0">
 
         <p className="animate-fade-in-up mb-8 font-[family-name:var(--font-mono)] text-xs tracking-[0.3em] text-white/30 uppercase">
-          proof of work — not promises
+          proof of work, not promises
         </p>
 
         <h1
@@ -27,7 +27,7 @@ export default function Hero() {
           className="animate-fade-in-up mx-auto mt-7 max-w-lg text-base leading-7 text-white/40 sm:text-lg"
           style={{ animationDelay: "0.1s", animationFillMode: "both" }}
         >
-          Submit proof of what you shipped —{" "}
+          Submit proof of what you shipped,{" "}
           <span className="text-white/60 font-medium">validated by the room</span>, not by claims.
         </p>
 
@@ -46,6 +46,16 @@ export default function Hero() {
             60 seconds · proof-gated
           </p>
         </div>
+      </div>
+
+      <div
+        className="animate-fade-in-up absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+        style={{ animationDelay: "0.3s", animationFillMode: "both" }}
+      >
+        <span className="font-[family-name:var(--font-mono)] text-[10px] tracking-[0.3em] text-white/20 uppercase">
+          scroll
+        </span>
+        <span className="text-white/20">↓</span>
       </div>
     </section>
   );

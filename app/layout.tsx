@@ -18,12 +18,12 @@ const spaceMono = Space_Mono({
 export const metadata: Metadata = {
   title: "The Darkroom",
   description:
-    "Enter the room. Build what matters. A space for builders, creators, and focused minds.",
+    "A Room Score built from real proof: social, builder, and work. Not follower counts. Free for builders.",
   metadataBase: new URL("https://www.thedarkroom.xyz"),
   openGraph: {
     title: "The Darkroom",
     description:
-      "Enter the room. Build what matters. A space for builders, creators, and focused minds.",
+      "A Room Score built from real proof: social, builder, and work. Not follower counts. Free for builders.",
     url: "https://www.thedarkroom.xyz",
     siteName: "The Darkroom",
     type: "website",
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "The Darkroom",
     description:
-      "Enter the room. Build what matters. A space for builders, creators, and focused minds.",
+      "A Room Score built from real proof: social, builder, and work. Not follower counts. Free for builders.",
   },
   icons: {
     icon: [
