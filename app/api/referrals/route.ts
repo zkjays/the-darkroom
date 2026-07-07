@@ -40,10 +40,16 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true });
 }
 
-// GET /api/referrals?handle=X — referral stats for a handle
+// GET /api/referrals?handle=X — referral stats for a handle.
+// count/xp_earned_total are harmless aggregates shown on public profiles, but
+// `recent` names who was referred — only the owner gets that list (same IDOR
+// pattern as /api/goals: a non-owner can't opt into seeing someone else's).
 export async function GET(req: NextRequest) {
   const handle = req.nextUrl.searchParams.get("handle");
   if (!handle) return NextResponse.json({ error: "Missing handle" }, { status: 400 });
+
+  const session = await getServerSession(authOptions);
+  const isOwner = (session as { handle?: string } | null)?.handle === handle;
 
   const db = getServiceSupabase();
 
@@ -65,7 +71,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     count: (referrals ?? []).length,
-    recent: (referrals ?? []).slice(0, 5),
+    recent: isOwner ? (referrals ?? []).slice(0, 5) : [],
     xp_earned_total,
   });
 }
