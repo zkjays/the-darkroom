@@ -245,6 +245,20 @@ export default function Dashboard() {
                     <span className="hidden lg:block font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] uppercase">ROOMBOARD</span>
                   </button>
                 )}
+                {tab.id === "id" && (
+                  <button
+                    onClick={() => router.push("/darkcircle")}
+                    className="flex items-center gap-3 rounded-sm border border-transparent px-3 py-2.5 transition-all w-full text-left text-white/50 hover:text-white hover:border-white/[0.15]"
+                  >
+                    <span className="flex-shrink-0 w-5 h-5">
+                      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                        <circle cx="12" cy="12" r="8.25" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="12" cy="12" r="1.75" fill="currentColor" stroke="none" />
+                      </svg>
+                    </span>
+                    <span className="hidden lg:block font-[family-name:var(--font-mono)] text-xs tracking-[0.15em] uppercase">DARKCIRCLE</span>
+                  </button>
+                )}
               </Fragment>
             );
           })}

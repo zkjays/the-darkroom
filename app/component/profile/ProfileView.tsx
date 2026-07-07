@@ -6,7 +6,6 @@ import { ACCENT_HEX } from "../../dashboard/_styles";
 import { WORK_PROOF_POINTS, PROOF_CATEGORY_MAP } from "../../dashboard/_work-constants";
 import { ProofRing } from "../../dashboard/StatsPanel";
 import { ProofGrid } from "./ProofGrid";
-import { DarkCircle } from "./DarkCircle";
 
 const REFERRALS_NEEDED = 25;
 
@@ -90,7 +89,6 @@ export function ProfileView({
   const claimHref = refParam ? `/darkroom-id?ref=${encodeURIComponent(refParam)}` : "/darkroom-id";
 
   const [localProofs, setLocalProofs] = useState<WorkProof[]>(proofs);
-  const hasBuilderProof = localProofs.some((p) => (PROOF_CATEGORY_MAP[p.proof_type] ?? "builder") === "builder");
   const [selectedProof, setSelectedProof] = useState<WorkProof | null>(null);
   const [endorsedIds, setEndorsedIds] = useState<Set<string>>(new Set());
   const [shareCopied, setShareCopied] = useState(false);
@@ -417,24 +415,6 @@ export function ProfileView({
               </button>
             )}
           </div>
-        )}
-
-        {/* ── Owner-only: private DarkCircle watchlist ── */}
-        {/* Locked until the first builder proof lands — DarkCircle is for tracking
-            other builders, so you unlock it by proving you're one yourself. */}
-        {owner && (
-          hasBuilderProof ? (
-            <div className="mt-10">
-              <DarkCircle handle={handle} />
-            </div>
-          ) : (
-            <div className="mt-10 border border-white/[0.08] rounded-2xl bg-white/[0.02] px-5 py-5 text-center">
-              <p className="font-[family-name:var(--font-mono)] text-xs text-white/40 tracking-[0.2em] uppercase mb-2">◐ DarkCircle</p>
-              <p className="font-[family-name:var(--font-mono)] text-xs text-white/40">
-                Submit your first work proof in the Work tab to unlock DarkCircle.
-              </p>
-            </div>
-          )
         )}
 
         {/* ── Public footer ── */}
