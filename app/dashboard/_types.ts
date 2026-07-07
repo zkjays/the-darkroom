@@ -77,6 +77,7 @@ export interface DarkCircleEntry {
   profile_image_url?: string;
   archetype?: string;
   total_score?: number;
+  plugs?: number;
 }
 
 export const STATS = [

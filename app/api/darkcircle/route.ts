@@ -56,6 +56,20 @@ export async function GET(req: NextRequest) {
 
   const profileByHandle = new Map((profiles ?? []).map((p) => [p.handle, p]));
 
+  // Total plugs received — summed from the endorsement_count already kept in
+  // sync on each completed proof (see /api/endorsements), not re-aggregated
+  // from goal_endorsements. Same "plugs" concept as app/lib/plug.ts.
+  const { data: proofRows } = await db
+    .from("daily_goals")
+    .select("handle, endorsement_count")
+    .in("handle", watchedHandles)
+    .eq("status", "completed");
+
+  const plugsByHandle = new Map<string, number>();
+  (proofRows ?? []).forEach((p) => {
+    plugsByHandle.set(p.handle, (plugsByHandle.get(p.handle) ?? 0) + (p.endorsement_count ?? 0));
+  });
+
   const entries = (rows ?? []).map((r) => {
     const p = profileByHandle.get(r.watched_handle);
     return {
@@ -64,6 +78,7 @@ export async function GET(req: NextRequest) {
       profile_image_url: p?.profile_image_url ?? undefined,
       archetype: p?.archetype ?? undefined,
       total_score: p ? (p.total_score ?? Math.min(100, (p.score ?? 0) + (p.bonus_points ?? 0))) : undefined,
+      plugs: plugsByHandle.get(r.watched_handle) ?? 0,
     };
   });
 

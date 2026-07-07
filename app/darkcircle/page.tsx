@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "../component/landing/Navbar";
 import { sanitizeHandle, isValidHandle } from "../lib/sanitize";
 import { PROOF_CATEGORY_MAP } from "../dashboard/_work-constants";
+import { plugTier } from "../lib/plug";
 import type { WorkProof, DarkCircleEntry } from "../dashboard/_types";
 
 interface SearchResult {
@@ -16,11 +18,23 @@ interface SearchResult {
 }
 
 const ORBIT_SIZE = 560;
-const ORBIT_RADIUS = 220;
+const ORBIT_RADIUS = 200;
 const CENTER = ORBIT_SIZE / 2;
+const PLUG_CAP = 15; // same top-end threshold as plugTier's elite halo
 
-function bubbleSize(score?: number) {
-  return 44 + (Math.min(100, Math.max(0, score ?? 0)) / 100) * 40;
+// Size is driven by plugs received, not score — DarkCircle is about who's
+// getting real traction, not raw score. Capped at PLUG_CAP so one runaway
+// account doesn't swallow the orbit.
+function bubbleSize(plugs?: number) {
+  return 40 + (Math.min(PLUG_CAP, Math.max(0, plugs ?? 0)) / PLUG_CAP) * 44;
+}
+
+// Deterministic per-handle pseudo-random, so float params stay stable across
+// re-renders instead of jumping every time entries reload.
+function seedFrom(str: string) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return h;
 }
 
 function Avatar({ url, handle, size }: { url?: string; handle: string; size: number }) {
@@ -54,6 +68,7 @@ export default function DarkCirclePage() {
   const { data: session, status: authStatus } = useSession();
   const router = useRouter();
   const handle = (session as { handle?: string } | null)?.handle;
+  const prefersReducedMotion = useReducedMotion();
 
   const [hasBuilderProof, setHasBuilderProof] = useState<boolean | null>(null);
   const [ownAvatar, setOwnAvatar] = useState<string | undefined>(undefined);
@@ -124,10 +139,17 @@ export default function DarkCirclePage() {
     () =>
       entries.map((entry, i) => {
         const angle = (2 * Math.PI * i) / Math.max(1, entries.length) - Math.PI / 2;
+        const seed = seedFrom(entry.watched_handle);
         return {
           entry,
           x: CENTER + ORBIT_RADIUS * Math.cos(angle),
           y: CENTER + ORBIT_RADIUS * Math.sin(angle),
+          float: {
+            ampX: 6 + (seed % 9), // 6–14px
+            ampY: 6 + ((seed >> 4) % 9),
+            duration: 5 + ((seed >> 8) % 6), // 5–10s
+            delay: ((seed >> 12) % 30) / 10, // 0–2.9s, desyncs the bubbles
+          },
         };
       }),
     [entries]
@@ -307,16 +329,41 @@ export default function DarkCirclePage() {
                 </p>
               )}
 
-              {positioned.map(({ entry, x, y }) => {
-                const size = bubbleSize(entry.total_score);
+              {positioned.map(({ entry, x, y, float }) => {
+                const size = bubbleSize(entry.plugs);
+                const tier = plugTier(entry.plugs ?? 0);
                 return (
                   <div
                     key={entry.watched_handle}
-                    className="absolute flex flex-col items-center gap-1.5 group"
+                    className="absolute"
                     style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}
                   >
+                  <motion.div
+                    className="flex flex-col items-center gap-1.5 group"
+                    initial={{ opacity: 0, scale: 0.6 }}
+                    animate={
+                      prefersReducedMotion
+                        ? { opacity: 1, scale: 1 }
+                        : { opacity: 1, scale: 1, x: [0, float.ampX, 0, -float.ampX, 0], y: [0, -float.ampY, 0, float.ampY, 0] }
+                    }
+                    transition={
+                      prefersReducedMotion
+                        ? { duration: 0.3 }
+                        : {
+                            opacity: { duration: 0.3 },
+                            scale: { duration: 0.3 },
+                            x: { duration: float.duration, delay: float.delay, repeat: Infinity, ease: "easeInOut" },
+                            y: { duration: float.duration * 1.15, delay: float.delay, repeat: Infinity, ease: "easeInOut" },
+                          }
+                    }
+                  >
                     <a href={`/p/${entry.watched_handle}`} className="relative">
-                      <Avatar url={entry.profile_image_url} handle={entry.watched_handle} size={size} />
+                      <div
+                        className="rounded-full"
+                        style={{ boxShadow: tier.glow > 0 ? `0 0 ${8 + tier.glow * 14}px ${tier.halo ? 3 : 1}px ${tier.color}` : "none" }}
+                      >
+                        <Avatar url={entry.profile_image_url} handle={entry.watched_handle} size={size} />
+                      </div>
                       <button
                         onClick={(e) => {
                           e.preventDefault();
@@ -331,11 +378,19 @@ export default function DarkCirclePage() {
                       </button>
                     </a>
                     <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/50 whitespace-nowrap">@{entry.watched_handle}</span>
-                    {typeof entry.total_score === "number" && (
-                      <span className="font-[family-name:var(--font-mono)] text-[9px] font-medium" style={{ color: "#c9a84c" }}>
-                        {entry.total_score}
-                      </span>
-                    )}
+                    <span className="flex items-center gap-2">
+                      {typeof entry.total_score === "number" && (
+                        <span className="font-[family-name:var(--font-mono)] text-[9px] font-medium" style={{ color: "#c9a84c" }}>
+                          {entry.total_score}
+                        </span>
+                      )}
+                      {!!entry.plugs && (
+                        <span className="font-[family-name:var(--font-mono)] text-[9px] font-medium" style={{ color: tier.color }}>
+                          ◐ {entry.plugs}
+                        </span>
+                      )}
+                    </span>
+                  </motion.div>
                   </div>
                 );
               })}
