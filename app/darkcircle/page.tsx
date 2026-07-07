@@ -37,6 +37,26 @@ function seedFrom(str: string) {
   return h;
 }
 
+// Seeded RNG (mulberry32) — gives each bubble its own irregular, non-repeating
+// drift path instead of a clean back-and-forth, so the motion reads as ambient
+// wandering rather than a mechanical metronome.
+function mulberry32(seed: number) {
+  return function () {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function driftKeyframes(rng: () => number, amp: number) {
+  return [0, (rng() * 2 - 1) * amp, (rng() * 2 - 1) * amp, (rng() * 2 - 1) * amp, 0];
+}
+
+const ZOOM_MIN = 0.6;
+const ZOOM_MAX = 1.9;
+
 function Avatar({ url, handle, size }: { url?: string; handle: string; size: number }) {
   const [failed, setFailed] = useState(false);
   if (!url || failed) {
@@ -80,6 +100,9 @@ export default function DarkCirclePage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  const [zoom, setZoom] = useState(1);
+
+  const zoomBy = (delta: number) => setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z + delta)));
 
   useEffect(() => {
     if (authStatus === "loading") return;
@@ -139,16 +162,18 @@ export default function DarkCirclePage() {
     () =>
       entries.map((entry, i) => {
         const angle = (2 * Math.PI * i) / Math.max(1, entries.length) - Math.PI / 2;
-        const seed = seedFrom(entry.watched_handle);
+        const rng = mulberry32(seedFrom(entry.watched_handle));
+        const amp = 7 + rng() * 7; // 7–14px — a drift, not a bounce
         return {
           entry,
           x: CENTER + ORBIT_RADIUS * Math.cos(angle),
           y: CENTER + ORBIT_RADIUS * Math.sin(angle),
           float: {
-            ampX: 6 + (seed % 9), // 6–14px
-            ampY: 6 + ((seed >> 4) % 9),
-            duration: 5 + ((seed >> 8) % 6), // 5–10s
-            delay: ((seed >> 12) % 30) / 10, // 0–2.9s, desyncs the bubbles
+            xKeyframes: driftKeyframes(rng, amp),
+            yKeyframes: driftKeyframes(rng, amp),
+            durationX: 16 + rng() * 10, // 16–26s — slow, ambient
+            durationY: 16 + rng() * 10,
+            delay: rng() * 4,
           },
         };
       }),
@@ -289,7 +314,39 @@ export default function DarkCirclePage() {
             </div>
             {msg && <p className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 -mt-8 mb-8">{msg}</p>}
 
-            <div className="relative mb-10" style={{ width: ORBIT_SIZE, height: ORBIT_SIZE, maxWidth: "100%" }}>
+            <div
+              className="relative mb-10 overflow-hidden rounded-2xl"
+              style={{ width: ORBIT_SIZE, height: ORBIT_SIZE, maxWidth: "100%" }}
+              onWheel={(e) => {
+                e.preventDefault();
+                zoomBy(-e.deltaY * 0.0012);
+              }}
+            >
+              {/* Zoom controls */}
+              <div className="absolute top-3 right-3 z-10 flex flex-col border border-white/10 bg-[#0a0a0d]/80 rounded-sm overflow-hidden">
+                <button
+                  onClick={() => zoomBy(0.2)}
+                  aria-label="Zoom in"
+                  className="w-7 h-7 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors text-sm"
+                >
+                  +
+                </button>
+                <div className="h-px bg-white/10" />
+                <button
+                  onClick={() => zoomBy(-0.2)}
+                  aria-label="Zoom out"
+                  className="w-7 h-7 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors text-sm"
+                >
+                  −
+                </button>
+              </div>
+
+              <motion.div
+                className="absolute inset-0"
+                animate={{ scale: zoom }}
+                transition={{ type: "spring", stiffness: 120, damping: 20 }}
+                style={{ transformOrigin: "center center" }}
+              >
               <svg
                 className="absolute inset-0 pointer-events-none"
                 width="100%"
@@ -344,7 +401,7 @@ export default function DarkCirclePage() {
                     animate={
                       prefersReducedMotion
                         ? { opacity: 1, scale: 1 }
-                        : { opacity: 1, scale: 1, x: [0, float.ampX, 0, -float.ampX, 0], y: [0, -float.ampY, 0, float.ampY, 0] }
+                        : { opacity: 1, scale: 1, x: float.xKeyframes, y: float.yKeyframes }
                     }
                     transition={
                       prefersReducedMotion
@@ -352,8 +409,8 @@ export default function DarkCirclePage() {
                         : {
                             opacity: { duration: 0.3 },
                             scale: { duration: 0.3 },
-                            x: { duration: float.duration, delay: float.delay, repeat: Infinity, ease: "easeInOut" },
-                            y: { duration: float.duration * 1.15, delay: float.delay, repeat: Infinity, ease: "easeInOut" },
+                            x: { duration: float.durationX, delay: float.delay, repeat: Infinity, ease: "easeInOut" },
+                            y: { duration: float.durationY, delay: float.delay, repeat: Infinity, ease: "easeInOut" },
                           }
                     }
                   >
@@ -394,6 +451,7 @@ export default function DarkCirclePage() {
                   </div>
                 );
               })}
+              </motion.div>
             </div>
           </>
         )}
