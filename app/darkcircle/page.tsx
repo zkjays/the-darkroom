@@ -8,6 +8,13 @@ import { sanitizeHandle, isValidHandle } from "../lib/sanitize";
 import { PROOF_CATEGORY_MAP } from "../dashboard/_work-constants";
 import type { WorkProof, DarkCircleEntry } from "../dashboard/_types";
 
+interface SearchResult {
+  handle: string;
+  profile_image_url?: string;
+  archetype?: string;
+  total_score?: number;
+}
+
 const ORBIT_SIZE = 560;
 const ORBIT_RADIUS = 220;
 const CENTER = ORBIT_SIZE / 2;
@@ -56,6 +63,8 @@ export default function DarkCirclePage() {
   const [adding, setAdding] = useState(false);
   const [removingHandle, setRemovingHandle] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
 
   useEffect(() => {
     if (authStatus === "loading") return;
@@ -92,6 +101,25 @@ export default function DarkCirclePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handle, hasBuilderProof]);
 
+  useEffect(() => {
+    const q = sanitizeHandle(input);
+    if (!q) {
+      setSuggestions([]);
+      return;
+    }
+    const watchedHandles = new Set(entries.map((e) => e.watched_handle));
+    const timer = setTimeout(() => {
+      fetch(`/api/darkcircle/search?q=${encodeURIComponent(q)}`, { credentials: "include" })
+        .then((r) => r.json())
+        .then((json: { results?: SearchResult[] }) => {
+          const results = (json.results ?? []).filter((r) => r.handle !== handle && !watchedHandles.has(r.handle));
+          setSuggestions(results);
+        })
+        .catch(() => setSuggestions([]));
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [input, handle, entries]);
+
   const positioned = useMemo(
     () =>
       entries.map((entry, i) => {
@@ -105,9 +133,9 @@ export default function DarkCirclePage() {
     [entries]
   );
 
-  const addToCircle = async () => {
+  const addToCircle = async (target?: string) => {
     if (!handle) return;
-    const watched = sanitizeHandle(input);
+    const watched = sanitizeHandle(target ?? input);
     if (!watched || !isValidHandle(watched)) {
       setMsg("Enter a valid handle.");
       return;
@@ -118,6 +146,7 @@ export default function DarkCirclePage() {
     }
     setAdding(true);
     setMsg(null);
+    setSuggestOpen(false);
     try {
       const res = await fetch("/api/darkcircle", {
         method: "POST",
@@ -131,6 +160,7 @@ export default function DarkCirclePage() {
         return;
       }
       setInput("");
+      setSuggestions([]);
       load();
     } catch {
       setMsg("Failed to add — try again.");
@@ -186,23 +216,54 @@ export default function DarkCirclePage() {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 w-full max-w-sm mb-10">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") addToCircle();
-                }}
-                placeholder="@handle to watch"
-                className="flex-1 bg-white/[0.03] border border-white/10 rounded-sm px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors"
-              />
-              <button
-                onClick={addToCircle}
-                disabled={adding || !input.trim()}
-                className="font-[family-name:var(--font-mono)] text-[11px] tracking-widest uppercase text-slate-300 hover:text-white border border-white/10 hover:border-white/25 rounded-sm px-4 py-2 transition-all disabled:opacity-40"
-              >
-                {adding ? "Adding…" : "Add"}
-              </button>
+            <div className="relative w-full max-w-sm mb-10">
+              <div className="flex items-center gap-2">
+                <input
+                  value={input}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    setSuggestOpen(true);
+                  }}
+                  onFocus={() => setSuggestOpen(true)}
+                  onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addToCircle();
+                  }}
+                  placeholder="@handle to watch"
+                  className="flex-1 bg-white/[0.03] border border-white/10 rounded-sm px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors"
+                />
+                <button
+                  onClick={() => addToCircle()}
+                  disabled={adding || !input.trim()}
+                  className="font-[family-name:var(--font-mono)] text-[11px] tracking-widest uppercase text-slate-300 hover:text-white border border-white/10 hover:border-white/25 rounded-sm px-4 py-2 transition-all disabled:opacity-40"
+                >
+                  {adding ? "Adding…" : "Add"}
+                </button>
+              </div>
+
+              {suggestOpen && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1.5 border border-white/10 bg-[#0a0a0d] rounded-sm overflow-hidden z-10">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s.handle}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => addToCircle(s.handle)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.05] transition-colors text-left"
+                    >
+                      <Avatar url={s.profile_image_url} handle={s.handle} size={24} />
+                      <span className="text-sm text-white flex-1 truncate">@{s.handle}</span>
+                      {s.archetype && (
+                        <span className="font-[family-name:var(--font-mono)] text-[9px] text-white/30 uppercase truncate">{s.archetype}</span>
+                      )}
+                      {typeof s.total_score === "number" && (
+                        <span className="font-[family-name:var(--font-mono)] text-[10px] font-medium flex-shrink-0" style={{ color: "#c9a84c" }}>
+                          {s.total_score}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {msg && <p className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 -mt-8 mb-8">{msg}</p>}
 
