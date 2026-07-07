@@ -230,7 +230,7 @@ export default function DarkCirclePage() {
                     if (e.key === "Enter") addToCircle();
                   }}
                   placeholder="@handle to watch"
-                  className="flex-1 bg-white/[0.03] border border-white/10 rounded-sm px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors"
+                  className="flex-1 bg-white/[0.03] border border-white/10 rounded-sm px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a84c]/50 focus:border-white/25 transition-colors"
                 />
                 <button
                   onClick={() => addToCircle()}
@@ -324,6 +324,7 @@ export default function DarkCirclePage() {
                         }}
                         disabled={removingHandle === entry.watched_handle}
                         title="Remove from DarkCircle"
+                        aria-label={`Remove @${entry.watched_handle} from DarkCircle`}
                         className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#0a0a0a] border border-white/20 text-white/40 hover:text-red-400 hover:border-red-400/40 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-40"
                       >
                         ✕

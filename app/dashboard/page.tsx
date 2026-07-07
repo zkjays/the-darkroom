@@ -207,6 +207,8 @@ export default function Dashboard() {
               <Fragment key={tab.id}>
                 <button
                   onClick={() => setActiveTab(tab.id)}
+                  aria-label={tab.label}
+                  aria-current={isActive ? "page" : undefined}
                   style={isActive ? { borderColor: "rgba(201,168,76,0.45)", color: "#c9a84c" } : { borderColor: "transparent" }}
                   className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 transition-all w-full text-left ${
                     isActive ? "" : "text-white/50 hover:text-white hover:border-white/[0.15]"
@@ -235,6 +237,7 @@ export default function Dashboard() {
                 {tab.id === "id" && (
                   <button
                     onClick={() => router.push("/leaderboard")}
+                    aria-label="Roomboard"
                     className="flex items-center gap-3 rounded-sm border border-transparent px-3 py-2.5 transition-all w-full text-left text-white/50 hover:text-white hover:border-white/[0.15]"
                   >
                     <span className="flex-shrink-0 w-5 h-5">
@@ -248,6 +251,7 @@ export default function Dashboard() {
                 {tab.id === "id" && (
                   <button
                     onClick={() => router.push("/darkcircle")}
+                    aria-label="DarkCircle"
                     className="flex items-center gap-3 rounded-sm border border-transparent px-3 py-2.5 transition-all w-full text-left text-white/50 hover:text-white hover:border-white/[0.15]"
                   >
                     <span className="flex-shrink-0 w-5 h-5">
