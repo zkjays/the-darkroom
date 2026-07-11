@@ -270,6 +270,7 @@ export function SubmitWorkModal({
                   <img src={ogImage} alt="Preview" className="w-full h-full object-cover" />
                   <button
                     onClick={() => setOgImage(null)}
+                    aria-label="Remove image"
                     className="absolute top-2 right-2 text-white/55 hover:text-white bg-black/70 rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
                   >
                     ×

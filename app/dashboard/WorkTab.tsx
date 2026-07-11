@@ -413,6 +413,7 @@ export function WorkTab({
                         <img src={editImageUrl} alt="Preview" className="w-full h-full object-cover opacity-70" />
                         <button
                           onClick={() => setEditImageUrl(null)}
+                          aria-label="Remove image"
                           className="absolute top-2 right-2 text-white/55 hover:text-white bg-black/60 rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
                         >
                           ×
