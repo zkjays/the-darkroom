@@ -12,14 +12,25 @@ interface XPState {
   accent: string;
 }
 
-interface Notification {
-  id: string;
-  endorser_handle: string;
-  endorser_pfp?: string;
-  goal_text: string;
-  goal_id: string;
-  created_at: string;
-}
+type Notification =
+  | {
+      id: string;
+      type: "endorsement";
+      endorser_handle: string;
+      endorser_pfp?: string;
+      goal_text: string;
+      goal_id: string;
+      created_at: string;
+    }
+  | {
+      id: string;
+      type: "peer_overtake";
+      proof_type: string;
+      top_handle: string;
+      top_handle_pfp?: string;
+      top_points: number;
+      created_at: string;
+    };
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -186,7 +197,25 @@ export default function Navbar() {
                   {notifications.length === 0 ? (
                     <p className="px-4 py-3 text-xs text-slate-500">No plugs yet.</p>
                   ) : (
-                    notifications.map((n) => (
+                    notifications.map((n) => n.type === "peer_overtake" ? (
+                      <Link
+                        key={n.id}
+                        href={`/p/${n.top_handle}`}
+                        onClick={() => setNotifOpen(false)}
+                        className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-0"
+                      >
+                        {n.top_handle_pfp ? (
+                          <img src={n.top_handle_pfp} alt={n.top_handle} width={24} height={24} className="rounded-full flex-shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-white/[0.06] flex-shrink-0" />
+                        )}
+                        <span className="text-xs text-slate-300 leading-snug">
+                          <span className="font-semibold" style={{ color: "#c9a84c" }}>@{n.top_handle}</span>{" "}
+                          is trending #1 in {n.proof_type} — see what they&apos;re shipping
+                          <span className="block text-slate-500 mt-0.5">{timeAgo(n.created_at)} ago</span>
+                        </span>
+                      </Link>
+                    ) : (
                       <Link
                         key={n.id}
                         href="/dashboard"

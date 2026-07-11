@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth-options";
 import { sanitizeHandle } from "@/app/lib/sanitize";
 import { WORK_PROOF_POINTS as PROOF_POINTS } from "@/app/dashboard/_work-constants";
+import { calcWorkProof, recalcAndPersistScore } from "@/app/lib/room-score";
 
 /*
   ── REQUIRED MIGRATIONS (run once in Supabase SQL Editor) ────────────────────
@@ -17,37 +18,6 @@ import { WORK_PROOF_POINTS as PROOF_POINTS } from "@/app/dashboard/_work-constan
 
 function today() {
   return new Date().toISOString().split("T")[0];
-}
-
-async function calcWorkProof(db: ReturnType<typeof getServiceSupabase>, handle: string): Promise<number> {
-  const { data: proofs } = await db
-    .from("daily_goals")
-    .select("id, proof_type")
-    .eq("handle", handle)
-    .eq("status", "completed")
-    .filter("proof_value", "not.is", null);
-
-  if (!proofs || proofs.length === 0) return 0;
-
-  const proofIds = proofs.map((p: { id: string }) => p.id);
-  const { data: endorsements } = await db
-    .from("goal_endorsements")
-    .select("goal_id")
-    .in("goal_id", proofIds);
-
-  const counts: Record<string, number> = {};
-  endorsements?.forEach((e: { goal_id: string }) => {
-    counts[e.goal_id] = (counts[e.goal_id] ?? 0) + 1;
-  });
-
-  const totalPoints = proofs.reduce((sum: number, p: { id: string; proof_type: string }) => {
-    const base = PROOF_POINTS[p.proof_type] ?? 3;
-    const count = counts[p.id] ?? 0;
-    const multiplier = count >= 3 ? 1.5 : count >= 1 ? 1.0 : 0.5;
-    return sum + Math.round(base * multiplier);
-  }, 0);
-
-  return Math.min(100, Math.round((totalPoints / 50) * 100));
 }
 
 function sessionHandle(session: object | null): string | undefined {
@@ -304,19 +274,7 @@ export async function POST(req: NextRequest) {
     let newWorkProof = 0;
     try {
       newWorkProof = await calcWorkProof(db, handle);
-      const { data: idRow } = await db
-        .from("darkroom_ids")
-        .select("social_proof, builder_proof, bonus_points")
-        .eq("handle", handle)
-        .single();
-      if (idRow) {
-        const newRoomScore = Math.round(
-          (idRow.social_proof ?? 0) * 0.35 +
-          (idRow.builder_proof ?? 0) * 0.35 +
-          newWorkProof * 0.30
-        );
-        await db.from("darkroom_ids").update({ work_proof: newWorkProof, score: newRoomScore }).eq("handle", handle);
-      }
+      await recalcAndPersistScore(db, handle, newWorkProof);
     } catch (e) {
       console.error("work_proof recalculation failed (non-critical):", e);
     }
@@ -376,24 +334,7 @@ export async function PATCH(req: NextRequest) {
       const db = getServiceSupabase();
 
       const newWorkProof = await calcWorkProof(db, handle);
-
-      const { data: idRow } = await db
-        .from("darkroom_ids")
-        .select("social_proof, builder_proof, bonus_points")
-        .eq("handle", handle)
-        .single();
-
-      if (idRow) {
-        const newRoomScore = Math.round(
-          (idRow.social_proof ?? 0) * 0.35 +
-          (idRow.builder_proof ?? 0) * 0.35 +
-          newWorkProof * 0.30
-        );
-        await db
-          .from("darkroom_ids")
-          .update({ work_proof: newWorkProof, score: newRoomScore })
-          .eq("handle", handle);
-      }
+      await recalcAndPersistScore(db, handle, newWorkProof);
 
       return NextResponse.json({ work_proof: newWorkProof });
     } catch (e) {
@@ -528,21 +469,7 @@ export async function DELETE(req: NextRequest) {
   await deductXP(db, handle, goal.target_stat ?? "work_proof", goal.xp_reward ?? 5);
 
   const newWorkProof = await calcWorkProof(db, handle);
-
-  const { data: idRow } = await db
-    .from("darkroom_ids")
-    .select("social_proof, builder_proof, bonus_points")
-    .eq("handle", handle)
-    .single();
-
-  if (idRow) {
-    const newRoomScore = Math.round(
-      (idRow.social_proof ?? 0) * 0.35 +
-      (idRow.builder_proof ?? 0) * 0.35 +
-      newWorkProof * 0.30
-    );
-    await db.from("darkroom_ids").update({ work_proof: newWorkProof, score: newRoomScore }).eq("handle", handle);
-  }
+  await recalcAndPersistScore(db, handle, newWorkProof);
 
   return NextResponse.json({ deleted: true, work_proof: newWorkProof });
 }
@@ -625,21 +552,9 @@ export async function PUT(req: NextRequest) {
     if (newCount === 1 || newCount === 3) {
       const handle = goal.handle;
       const newWorkProof = await calcWorkProof(db, handle);
+      const persisted = await recalcAndPersistScore(db, handle, newWorkProof);
 
-      const { data: idRow } = await db
-        .from("darkroom_ids")
-        .select("social_proof, builder_proof, bonus_points")
-        .eq("handle", handle)
-        .single();
-
-      if (idRow) {
-        const newRoomScore = Math.round(
-          (idRow.social_proof ?? 0) * 0.35 +
-          (idRow.builder_proof ?? 0) * 0.35 +
-          newWorkProof * 0.30
-        );
-        await db.from("darkroom_ids").update({ work_proof: newWorkProof, score: newRoomScore }).eq("handle", handle);
-
+      if (persisted) {
         try {
           await db.from("xp_earnings").insert({
             handle,
