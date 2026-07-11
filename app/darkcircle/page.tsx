@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -55,7 +55,6 @@ function driftKeyframes(rng: () => number, amp: number) {
 }
 
 const ZOOM_MIN = 0.6;
-const ZOOM_MAX = 1.9;
 
 function Avatar({ url, handle, size }: { url?: string; handle: string; size: number }) {
   const [failed, setFailed] = useState(false);
@@ -101,8 +100,52 @@ export default function DarkCirclePage() {
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [boxSize, setBoxSize] = useState(ORBIT_SIZE);
+  const orbitWrapperRef = useRef<HTMLDivElement>(null);
+  const orbitBoxRef = useRef<HTMLDivElement>(null);
+  // There's no pan/drag — everything must stay reachable inside the box, so
+  // zoom is capped at the level that exactly fits the content (1 = no crop).
+  // Below that, zooming out is still allowed down to ZOOM_MIN.
+  const maxZoomRef = useRef(1);
 
-  const zoomBy = (delta: number) => setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z + delta)));
+  // Bubbles are positioned with raw pixel coordinates in the ORBIT_SIZE
+  // (560px) space. The wrapper is measured (not the box itself, which we
+  // size explicitly below) so the box always renders as a real square at
+  // the actual available width — CSS aspect-ratio on a flex child fought
+  // the parent's auto sizing and left it uncentered/overflowing. Zoom is
+  // fit to that same measurement so bubbles never spill past the edge.
+  useLayoutEffect(() => {
+    const wrapper = orbitWrapperRef.current;
+    if (!wrapper) return;
+    const fit = (width: number) => {
+      if (width <= 0) return;
+      const fitZoom = Math.min(1, Math.max(ZOOM_MIN, width / ORBIT_SIZE));
+      setBoxSize(width);
+      maxZoomRef.current = fitZoom;
+      setZoom(fitZoom);
+    };
+    fit(wrapper.clientWidth);
+    const observer = new ResizeObserver((entries) => fit(entries[0].contentRect.width));
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, []);
+
+  const zoomBy = (delta: number) =>
+    setZoom((z) => Math.min(maxZoomRef.current, Math.max(ZOOM_MIN, z + delta)));
+
+  // React's synthetic onWheel is passive by default, so calling
+  // preventDefault() inside it silently fails and the page scrolls
+  // underneath while trying to zoom the orbit — attach a real listener.
+  useEffect(() => {
+    const el = orbitBoxRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setZoom((z) => Math.min(maxZoomRef.current, Math.max(ZOOM_MIN, z - e.deltaY * 0.0012)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   useEffect(() => {
     if (authStatus === "loading") return;
@@ -314,13 +357,60 @@ export default function DarkCirclePage() {
             </div>
             {msg && <p className="font-[family-name:var(--font-mono)] text-[10px] text-white/40 -mt-8 mb-8">{msg}</p>}
 
+            {/* Mobile: plain list — the orbit's floating bubbles have no room
+                to breathe (or pan) on a small screen, so don't fight it. */}
+            <div className="sm:hidden w-full max-w-sm mb-10 flex flex-col gap-2">
+              {loading && entries.length === 0 && (
+                <p className="text-center font-[family-name:var(--font-mono)] text-xs text-white/30 py-6">Loading…</p>
+              )}
+              {!loading && entries.length === 0 && (
+                <p className="text-center font-[family-name:var(--font-mono)] text-xs text-white/30 py-6">
+                  Empty — add builders you want to keep an eye on below.
+                </p>
+              )}
+              {entries.map((entry) => {
+                const tier = plugTier(entry.plugs ?? 0);
+                return (
+                  <div
+                    key={entry.watched_handle}
+                    className="flex items-center gap-3 border border-white/[0.08] rounded-lg bg-white/[0.02] px-3 py-2.5"
+                  >
+                    <a href={`/p/${entry.watched_handle}`} className="shrink-0">
+                      <Avatar url={entry.profile_image_url} handle={entry.watched_handle} size={40} />
+                    </a>
+                    <a href={`/p/${entry.watched_handle}`} className="flex-1 min-w-0">
+                      <p className="font-[family-name:var(--font-mono)] text-xs text-white truncate">@{entry.watched_handle}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {typeof entry.total_score === "number" && (
+                          <span className="font-[family-name:var(--font-mono)] text-[10px] font-medium" style={{ color: "#c9a84c" }}>
+                            {entry.total_score}
+                          </span>
+                        )}
+                        {!!entry.plugs && (
+                          <span className="font-[family-name:var(--font-mono)] text-[10px] font-medium" style={{ color: tier.color }}>
+                            ◐ {entry.plugs}
+                          </span>
+                        )}
+                      </div>
+                    </a>
+                    <button
+                      onClick={() => removeFromCircle(entry.watched_handle)}
+                      disabled={removingHandle === entry.watched_handle}
+                      aria-label={`Remove @${entry.watched_handle} from DarkCircle`}
+                      className="shrink-0 w-7 h-7 rounded-full border border-white/10 text-white/40 hover:text-red-400 hover:border-red-400/40 text-xs flex items-center justify-center transition-colors disabled:opacity-40"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div ref={orbitWrapperRef} className="hidden sm:block relative mb-10 w-full max-w-[560px] mx-auto">
             <div
-              className="relative mb-10 overflow-hidden rounded-2xl"
-              style={{ width: ORBIT_SIZE, height: ORBIT_SIZE, maxWidth: "100%" }}
-              onWheel={(e) => {
-                e.preventDefault();
-                zoomBy(-e.deltaY * 0.0012);
-              }}
+              ref={orbitBoxRef}
+              className="relative overflow-hidden rounded-2xl"
+              style={{ width: boxSize, height: boxSize }}
             >
               {/* Zoom controls */}
               <div className="absolute top-3 right-3 z-10 flex flex-col border border-white/10 bg-[#0a0a0d]/80 rounded-sm overflow-hidden">
@@ -434,7 +524,7 @@ export default function DarkCirclePage() {
                         ✕
                       </button>
                     </a>
-                    <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/50 whitespace-nowrap">@{entry.watched_handle}</span>
+                    <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/50 max-w-[90px] truncate">@{entry.watched_handle}</span>
                     <span className="flex items-center gap-2">
                       {typeof entry.total_score === "number" && (
                         <span className="font-[family-name:var(--font-mono)] text-[9px] font-medium" style={{ color: "#c9a84c" }}>
@@ -452,6 +542,7 @@ export default function DarkCirclePage() {
                 );
               })}
               </motion.div>
+            </div>
             </div>
           </>
         )}
