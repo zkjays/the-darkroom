@@ -146,7 +146,7 @@ export default function Navbar() {
         <div className="flex items-center gap-4">
           {xp && (
             <div
-              className="flex flex-col items-end gap-1"
+              className="hidden sm:flex flex-col items-end gap-1"
               title={`${xp.cost - xp.current} XP until next score point`}
             >
               <div className="flex items-center gap-1.5">
