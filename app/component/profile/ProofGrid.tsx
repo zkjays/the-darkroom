@@ -36,15 +36,37 @@ export function ProofGrid({
         const endorsementCount = proof.endorsement_count ?? 0;
         const isFeatured = endorsementCount >= 6;
         const isValidated = endorsementCount >= 3;
+        const isGithubVerified = proof.github_check_status === "owner_match";
+        // Verified tiles get a standing teal ring (brand's verification color, see the
+        // OAuth-verified badge on ProfileView's GitHub link) so they read as "already
+        // checked" at a glance in the grid, not just on hover.
+        const restShadow = isGithubVerified
+          ? "0 0 0 1.5px rgba(0,212,170,0.55), 0 2px 16px rgba(0,212,170,0.22)"
+          : "0 2px 10px rgba(0,0,0,0.45)";
+        const hoverShadow = isGithubVerified
+          ? "0 0 0 1.5px rgba(0,212,170,0.8), 0 8px 32px rgba(0,212,170,0.4)"
+          : "0 8px 28px rgba(0,0,0,0.75)";
         return (
           <div
             key={proof.id}
             onClick={() => onSelect(proof)}
             className="group relative aspect-square overflow-hidden cursor-pointer bg-[#0e0e12] transition-shadow duration-300"
-            style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.45)" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 28px rgba(0,0,0,0.75)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 10px rgba(0,0,0,0.45)"; }}
+            style={{ boxShadow: restShadow }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = hoverShadow; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = restShadow; }}
           >
+            {isGithubVerified && (
+              <div
+                title="GitHub ownership verified"
+                className="absolute top-1.5 right-1.5 z-10 w-5 h-5 rounded-full flex items-center justify-center"
+                style={{
+                  background: "linear-gradient(135deg, #5ffbe0 0%, #00d4aa 45%, #00967a 100%)",
+                  boxShadow: "0 1px 6px rgba(0,212,170,0.65), inset 0 1px 1px rgba(255,255,255,0.5)",
+                }}
+              >
+                <span className="text-black text-[10px] font-bold leading-none">✓</span>
+              </div>
+            )}
             {proof.image_url ? (
               <img
                 src={proof.image_url}
@@ -74,9 +96,14 @@ export function ProofGrid({
                 {proof.goal_text}
               </p>
               <div className="flex items-center justify-between">
-                <span className="font-[family-name:var(--font-mono)] text-[12px] tracking-widest font-semibold" style={{ color: accentHex }}>
-                  {WORK_TYPE_ICONS[proof.proof_type] ?? "·"} {proof.proof_type?.toUpperCase()}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-[family-name:var(--font-mono)] text-[12px] tracking-widest font-semibold" style={{ color: accentHex }}>
+                    {WORK_TYPE_ICONS[proof.proof_type] ?? "·"} {proof.proof_type?.toUpperCase()}
+                  </span>
+                  {proof.github_check_status === "owner_match" && (
+                    <span title="GitHub ownership verified" className="text-[10px] font-semibold" style={{ color: "#00d4aa" }}>✓GH</span>
+                  )}
+                </div>
                 <div className="flex items-center gap-1.5">
                   <div className="flex gap-1">
                     {[0, 1, 2].map((i) => (

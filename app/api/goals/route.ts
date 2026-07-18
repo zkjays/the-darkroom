@@ -4,7 +4,8 @@ import { convertXPToPoints, deductXP } from "@/app/lib/xp-system";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth-options";
 import { sanitizeHandle } from "@/app/lib/sanitize";
-import { WORK_PROOF_POINTS as PROOF_POINTS } from "@/app/dashboard/_work-constants";
+import { WORK_PROOF_POINTS as PROOF_POINTS, BUILDER_PROOF_TYPES } from "@/app/dashboard/_work-constants";
+import { parseGithubRepoUrl, checkGithubOwnership } from "@/app/lib/github-verify";
 
 /*
   ── REQUIRED MIGRATIONS (run once in Supabase SQL Editor) ────────────────────
@@ -12,6 +13,8 @@ import { WORK_PROOF_POINTS as PROOF_POINTS } from "@/app/dashboard/_work-constan
   ALTER TABLE darkroom_ids ADD COLUMN IF NOT EXISTS total_xp INTEGER DEFAULT 0;
   ALTER TABLE darkroom_ids ADD COLUMN IF NOT EXISTS stat_xp JSONB DEFAULT '{"focus":0,"consistency":0,"reliability":0,"growth":0,"work_proof":0}';
   ALTER TABLE daily_goals ADD COLUMN IF NOT EXISTS edited boolean DEFAULT false;
+  See supabase/migrations/20260716_github_proof_verification.sql for github_check_status/
+  github_checked_at/github_repo_owner.
   ─────────────────────────────────────────────────────────────────────────────
 */
 
@@ -86,6 +89,37 @@ function validateGoalFields(fields: {
     }
   }
   return null;
+}
+
+// Best-effort GitHub ownership check for a Builder proof — never throws, caller
+// wraps in try/catch anyway. No-ops silently when the proof isn't a Builder
+// type, the link isn't a github.com repo, or the submitter isn't GitHub-verified.
+async function runGithubCheck(
+  db: ReturnType<typeof getServiceSupabase>,
+  goalId: string,
+  proofType: string,
+  proofValue: string | null | undefined,
+  githubUsername: string | null | undefined,
+  githubVerified: boolean | null | undefined
+): Promise<void> {
+  if (!githubVerified || !githubUsername) return;
+  if (!(BUILDER_PROOF_TYPES as readonly string[]).includes(proofType)) return;
+  if (!proofValue) return;
+
+  const parsed = parseGithubRepoUrl(proofValue);
+  if (!parsed) return;
+
+  const result = await checkGithubOwnership(parsed.owner, parsed.repo, githubUsername);
+  if (!result) return; // shared rate-limit budget exhausted — deliberate skip, stays "unchecked"
+
+  await db
+    .from("daily_goals")
+    .update({
+      github_check_status: result.status,
+      github_checked_at: new Date().toISOString(),
+      github_repo_owner: "repoOwner" in result ? result.repoOwner : null,
+    })
+    .eq("id", goalId);
 }
 
 // GET /api/goals?handle=X                    — fetch today's goals for handle
@@ -205,7 +239,7 @@ export async function POST(req: NextRequest) {
   // Check handle exists
   const { data: user, error: userError } = await db
     .from("darkroom_ids")
-    .select("handle")
+    .select("handle, github_username, github_verified")
     .eq("handle", handle)
     .single();
 
@@ -321,6 +355,12 @@ export async function POST(req: NextRequest) {
       console.error("work_proof recalculation failed (non-critical):", e);
     }
 
+    try {
+      await runGithubCheck(db, goal.id, proof_type, proof_value, user.github_username, user.github_verified);
+    } catch (e) {
+      console.error("github ownership check failed (non-critical):", e);
+    }
+
     return NextResponse.json({ goal, xp: xpResult, work_proof: newWorkProof });
   }
 
@@ -400,6 +440,47 @@ export async function PATCH(req: NextRequest) {
       console.error("recalculate error:", e);
       return NextResponse.json({ work_proof: 0, error: String(e) });
     }
+  }
+
+  // ── GITHUB RECHECK branch: { github_recheck: true, goal_id } ──────────────
+  // Owner-triggered re-run of the ownership check (e.g. repo was private and
+  // is now public, or the shared rate-limit budget skipped it the first time).
+  if (body.github_recheck) {
+    const recheckGoalId = body.goal_id;
+    if (!recheckGoalId) return NextResponse.json({ error: "Missing goal_id" }, { status: 400 });
+
+    const db = getServiceSupabase();
+    const { data: goal, error: getError } = await db
+      .from("daily_goals")
+      .select("*")
+      .eq("id", recheckGoalId)
+      .single();
+
+    if (getError || !goal) return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+    if (sessionHandle(session) !== goal.handle) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+      const { data: submitter } = await db
+        .from("darkroom_ids")
+        .select("github_username, github_verified")
+        .eq("handle", goal.handle)
+        .single();
+
+      await runGithubCheck(db, goal.id, goal.proof_type, goal.proof_value, submitter?.github_username, submitter?.github_verified);
+    } catch (e) {
+      console.error("github recheck failed:", e);
+      return NextResponse.json({ error: "Recheck failed" }, { status: 500 });
+    }
+
+    const { data: refreshed } = await db
+      .from("daily_goals")
+      .select("github_check_status, github_checked_at, github_repo_owner")
+      .eq("id", recheckGoalId)
+      .single();
+
+    return NextResponse.json(refreshed ?? {});
   }
 
   const { handle: authHandle, goal_id, proof_value } = body;
@@ -693,9 +774,14 @@ export async function PUT(req: NextRequest) {
   if (is_public !== undefined) updates.is_public = is_public;
 
   // URL may only change when nobody has endorsed yet; never touch original_proof_value
-  if (proof_value !== undefined && proof_value !== goal.proof_value && (goal.endorsement_count ?? 0) === 0) {
+  const urlChanged = proof_value !== undefined && proof_value !== goal.proof_value && (goal.endorsement_count ?? 0) === 0;
+  if (urlChanged) {
     updates.proof_value = proof_value;
     updates.endorsement_count = 0;
+    // Old check result no longer applies to the new link — clear it, runGithubCheck below re-derives it.
+    updates.github_check_status = null;
+    updates.github_checked_at = null;
+    updates.github_repo_owner = null;
     await db.from("goal_endorsements").delete().eq("goal_id", id);
   }
 
@@ -709,6 +795,19 @@ export async function PUT(req: NextRequest) {
   if (updateError) {
     console.error("Goal update error:", JSON.stringify(updateError));
     return NextResponse.json({ error: "Failed to update goal" }, { status: 500 });
+  }
+
+  if (urlChanged && updated) {
+    try {
+      const { data: submitter } = await db
+        .from("darkroom_ids")
+        .select("github_username, github_verified")
+        .eq("handle", goal.handle)
+        .single();
+      await runGithubCheck(db, updated.id, updated.proof_type, updated.proof_value, submitter?.github_username, submitter?.github_verified);
+    } catch (e) {
+      console.error("github ownership check failed (non-critical):", e);
+    }
   }
 
   return NextResponse.json({ goal: updated });

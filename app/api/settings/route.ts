@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const db = getServiceSupabase();
   const { data, error } = await db
     .from("darkroom_ids")
-    .select("profile_public, goals_public, theme_accent, open_to_opportunities, bio, link_x, link_github, link_site")
+    .select("profile_public, goals_public, theme_accent, open_to_opportunities, bio, link_x, link_github, link_site, github_username, github_verified, github_verified_at")
     .eq("handle", handle)
     .single();
 
@@ -36,6 +36,9 @@ export async function GET(req: NextRequest) {
       link_x: "",
       link_github: "",
       link_site: "",
+      github_username: "",
+      github_verified: false,
+      github_verified_at: null,
     });
   }
 
@@ -48,6 +51,11 @@ export async function GET(req: NextRequest) {
     link_x: data.link_x ?? "",
     link_github: data.link_github ?? "",
     link_site: data.link_site ?? "",
+    // Read-only here — github_username/github_verified are never accepted by
+    // PATCH below. Only /api/github/callback (real OAuth exchange) may set them.
+    github_username: data.github_username ?? "",
+    github_verified: data.github_verified ?? false,
+    github_verified_at: data.github_verified_at ?? null,
   });
 }
 

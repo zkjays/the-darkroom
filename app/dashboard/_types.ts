@@ -42,6 +42,8 @@ export interface DashboardData {
   link_x?: string;
   link_github?: string;
   link_site?: string;
+  github_username?: string;
+  github_verified?: boolean;
 }
 
 export interface WorkProof {
@@ -60,6 +62,9 @@ export interface WorkProof {
   original_goal_text?: string;
   original_description?: string;
   original_image_url?: string;
+  github_check_status?: string;
+  github_checked_at?: string;
+  github_repo_owner?: string;
 }
 
 export type XpResult = {

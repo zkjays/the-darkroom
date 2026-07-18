@@ -40,6 +40,15 @@
 
 - `tsc --noEmit` → **0 erreurs** après refacto ✅
 
+### Chantier — Vérification GitHub (14/07/2026)
+- Migration `supabase/migrations/20260714_github_verification.sql` → `github_username`, `github_verified`, `github_verified_at` + index unique sur `lower(github_username)` (un compte GitHub vérifié ne peut être revendiqué que par un seul profil)
+- Flow OAuth manuel (PAS un provider NextAuth — `link_github`/session Twitter existante non touchés) : `app/api/github/connect/route.ts`, `app/api/github/callback/route.ts`, `app/api/github/disconnect/route.ts`
+- `app/api/settings/route.ts` : GET expose `github_username`/`github_verified`/`github_verified_at` en lecture seule — PATCH ne les accepte jamais en écriture (seule la route callback OAuth peut les modifier)
+- `app/api/dashboard/route.ts`, `app/dashboard/_types.ts` : champs ajoutés au select public + `DashboardData`
+- `app/dashboard/SettingsPanel.tsx` : bouton "Verify GitHub" / état "@handle ✓ Verified" + Disconnect
+- `app/dashboard/page.tsx` : lit `?tab=settings` au retour du callback OAuth (nécessite maintenant un wrapper `<Suspense>` autour de `DashboardContent` — pattern déjà utilisé dans `darkroom-id/page.tsx`)
+- `app/component/profile/ProfileView.tsx` : badge ✓ sur l'icône GitHub du profil public quand vérifié
+
 ---
 
 ## Checklist de tests
@@ -83,6 +92,21 @@
 - [ ] **23. Upload screenshot** → dans une GoalCard, tester upload screenshot → fichier uploadé sans erreur
 - [ ] **24. API sans auth** → DevTools → Network → POST sur `/api/endorsements` sans token → réponse 401
 - [ ] **25. Page publique** → aller sur `/p/tonhandle` → page charge correctement
+
+### 🔴 CRITIQUE — Vérification GitHub
+
+> Nécessite `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` configurés (OAuth App "Darkroom Dev", callback `http://localhost:3000/api/github/callback`)
+
+- [ ] **26. Bouton visible** → Settings, section GitHub non vérifiée → bouton "Verify GitHub" présent
+- [ ] **27. Redirect OAuth** → clic → redirection vers `github.com/login/oauth/authorize`
+- [ ] **28. Callback succès** → Autoriser sur GitHub → retour `/dashboard` (tab Settings) → "@handle ✓ Verified" affiché
+- [ ] **29. Persistance** → refresh la page → l'état vérifié reste affiché (lu depuis `darkroom_ids`)
+- [ ] **30. Profil public** → `/p/tonhandle` → icône GitHub affiche le badge vérifié (pastille ✓)
+- [ ] **31. Annulation** → cliquer "Cancel" sur l'écran GitHub → retour app sans crash, message "GitHub connection cancelled."
+- [ ] **32. Compte déjà revendiqué** → tenter de vérifier un compte GitHub déjà lié à un autre profil → message "already claimed", aucune donnée corrompue
+- [ ] **33. Disconnect** → bouton Disconnect → badge disparaît, `link_github` (si présent) réapparaît en fallback
+- [ ] **34. Anti-spoof PATCH** → DevTools/curl → `PATCH /api/settings` avec `github_verified: true` dans le body → ne doit PAS passer `github_verified` à `true` (vérifier en DB)
+- [ ] **35. Callback sans state** → appeler `/api/github/callback` directement sans cookie state → 400/redirect propre, pas de crash serveur
 
 ---
 
