@@ -42,6 +42,8 @@ export interface DashboardData {
   link_x?: string;
   link_github?: string;
   link_site?: string;
+  github_username?: string;
+  github_verified?: boolean;
 }
 
 export interface WorkProof {

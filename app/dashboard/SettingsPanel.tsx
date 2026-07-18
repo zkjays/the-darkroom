@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { copyToClipboard } from "./_styles";
 import { SITE_URL } from "./_types";
 
@@ -30,14 +31,30 @@ export function SettingsPanel({
   const [linkX, setLinkX] = useState("");
   const [linkGithub, setLinkGithub] = useState("");
   const [linkSite, setLinkSite] = useState("");
+  const [githubUsername, setGithubUsername] = useState("");
+  const [githubVerified, setGithubVerified] = useState(false);
+  const [githubMessage, setGithubMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [referralStats, setReferralStats] = useState<{ count: number; xp_earned_total: number } | null>(null);
   const [copied, setCopied] = useState(false);
   // The shareable Darkroom Card IS the referral mechanism (decision 14/06) — carry ?ref on /p/handle
   const referralLink = `${SITE_URL}/p/${handle}?ref=${handle}`;
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const BIO_MAX = 160;
+
+  const GITHUB_ERROR_MESSAGES: Record<string, string> = {
+    cancelled: "GitHub connection cancelled.",
+    state_mismatch: "Something went wrong — please try again.",
+    already_claimed: "That GitHub account is already verified on another Darkroom profile.",
+    token_exchange_failed: "Couldn't connect to GitHub — please try again.",
+    profile_fetch_failed: "Couldn't read your GitHub profile — please try again.",
+    not_configured: "GitHub verification isn't available right now.",
+    save_failed: "Couldn't save — please try again.",
+    unexpected: "Something went wrong — please try again.",
+  };
 
   useEffect(() => {
     fetch(`/api/referrals?handle=${encodeURIComponent(handle)}`)
@@ -51,9 +68,43 @@ export function SettingsPanel({
         setLinkX(d.link_x ?? "");
         setLinkGithub(d.link_github ?? "");
         setLinkSite(d.link_site ?? "");
+        setGithubUsername(d.github_username ?? "");
+        setGithubVerified(d.github_verified ?? false);
       })
       .catch(() => {});
   }, [handle]);
+
+  // Land here after the /api/github/callback redirect — surface the result once,
+  // then strip github/github_error from the URL so a refresh doesn't re-show it.
+  useEffect(() => {
+    const github = searchParams.get("github");
+    const githubError = searchParams.get("github_error");
+    if (!github && !githubError) return;
+
+    if (github === "connected") {
+      setGithubVerified(true);
+      setGithubMessage("GitHub connected ✓");
+    } else if (githubError) {
+      setGithubMessage(GITHUB_ERROR_MESSAGES[githubError] ?? GITHUB_ERROR_MESSAGES.unexpected);
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("github");
+    params.delete("github_error");
+    const query = params.toString();
+    router.replace(query ? `/dashboard?${query}` : "/dashboard", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const disconnectGithub = async () => {
+    setGithubMessage(null);
+    const res = await fetch("/api/github/disconnect", { method: "POST" });
+    const data = await res.json();
+    if (data.success) {
+      setGithubVerified(false);
+      setGithubUsername("");
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -145,6 +196,35 @@ export function SettingsPanel({
             className="w-full bg-white/[0.02] border border-white/[0.06] focus:border-[#c9a84c]/40 rounded-sm px-3 py-2 font-[family-name:var(--font-mono)] text-[11px] text-white/70 placeholder:text-white/20 outline-none transition-colors"
           />
         ))}
+      </div>
+
+      {/* GitHub verification */}
+      <div className="flex flex-col gap-2 px-5 py-4">
+        <p className="font-[family-name:var(--font-mono)] text-xs uppercase tracking-widest text-slate-400">GitHub verification</p>
+        {githubMessage && (
+          <p className="font-[family-name:var(--font-mono)] text-[10px] text-slate-500">{githubMessage}</p>
+        )}
+        {githubVerified ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-[family-name:var(--font-mono)] text-[11px] text-[#00d4aa]">
+              @{githubUsername} ✓ Verified
+            </span>
+            <button
+              onClick={disconnectGithub}
+              className="flex-shrink-0 font-[family-name:var(--font-mono)] text-[10px] text-slate-500 hover:text-white border border-white/10 hover:border-white/20 rounded-sm px-3 py-1 transition-all"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          // Real navigation (not fetch) — this is a cross-site OAuth redirect.
+          <a
+            href="/api/github/connect"
+            className="inline-flex w-fit items-center rounded-sm border border-white/10 hover:border-[#c9a84c]/40 px-3 py-2 font-[family-name:var(--font-mono)] text-[11px] text-white/70 hover:text-[#c9a84c] transition-all"
+          >
+            Verify GitHub
+          </a>
+        )}
       </div>
 
       {/* Open to opportunities */}

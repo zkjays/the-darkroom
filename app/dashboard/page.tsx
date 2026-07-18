@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Fragment, Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Navbar from "../component/landing/Navbar";
 import CardGenerator from "../component/darkroom-id/CardGenerator";
@@ -66,8 +66,9 @@ const TOUR_STEPS = [
 ] as const;
 
 // ── Main page ──────────────────────────────────────────────────────────────
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status: authStatus } = useSession();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -138,6 +139,12 @@ export default function Dashboard() {
     window.addEventListener("darkroom:switchTab", handler);
     return () => window.removeEventListener("darkroom:switchTab", handler);
   }, []);
+
+  // Land on the Settings tab when redirected back from an OAuth flow (e.g. GitHub verify).
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "id" || tab === "work" || tab === "settings") setActiveTab(tab as TabId);
+  }, [searchParams]);
 
   // Proofs + referral count for the ID/profile view (WYSIWYG with /p/[handle])
   const profileHandle = data?.handle;
@@ -487,5 +494,17 @@ export default function Dashboard() {
         );
       })()}
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#050508] text-white flex items-center justify-center">
+        <div className="w-7 h-7 rounded-full border-2 border-white/15 border-t-white/60 animate-spin" />
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }

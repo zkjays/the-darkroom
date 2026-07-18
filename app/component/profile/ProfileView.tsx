@@ -253,25 +253,44 @@ export function ProfileView({
                 <p className="text-sm text-slate-400 italic leading-relaxed">{data.tagline}</p>
               ) : null}
 
-              {(data.link_x || data.link_github || data.link_site) && (
-                <div className="flex items-center gap-2">
-                  {([
-                    { url: data.link_x, type: "x" as const },
-                    { url: data.link_github, type: "github" as const },
-                    { url: data.link_site, type: "site" as const },
-                  ]).filter((l) => isSafeHttpUrl(l.url)).map((l) => (
-                    <a
-                      key={l.type}
-                      href={l.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-8 h-8 flex items-center justify-center rounded-sm border border-white/10 text-slate-400 hover:text-white hover:border-white/30 transition-all"
-                    >
-                      <SocialIcon type={l.type} />
-                    </a>
-                  ))}
-                </div>
-              )}
+              {(() => {
+                // A verified GitHub OAuth link takes priority over the unverified
+                // free-text one — same field slot, stronger signal when present.
+                const githubUrl = data.github_verified && data.github_username
+                  ? `https://github.com/${data.github_username}`
+                  : data.link_github;
+                const socials = [
+                  { url: data.link_x, type: "x" as const, verified: false },
+                  { url: githubUrl, type: "github" as const, verified: !!data.github_verified },
+                  { url: data.link_site, type: "site" as const, verified: false },
+                ].filter((l) => isSafeHttpUrl(l.url));
+
+                if (socials.length === 0) return null;
+
+                return (
+                  <div className="flex items-center gap-2">
+                    {socials.map((l) => (
+                      <a
+                        key={l.type}
+                        href={l.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="relative w-8 h-8 flex items-center justify-center rounded-sm border border-white/10 text-slate-400 hover:text-white hover:border-white/30 transition-all"
+                      >
+                        <SocialIcon type={l.type} />
+                        {l.verified && (
+                          <span
+                            title="Verified GitHub account"
+                            className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#00d4aa] text-black flex items-center justify-center text-[8px] leading-none"
+                          >
+                            ✓
+                          </span>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                );
+              })()}
 
               <div className="flex flex-wrap items-center gap-1.5">
                 {data.streak && data.streak.current_streak > 0 && (

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     db
       .from("darkroom_ids")
       .select(
-        "handle, score, bonus_points, total_score, total_xp, social_proof, builder_proof, work_proof, analyzed_posts, last_refresh_at, archetype, tagline, analysis, darkroom_line, profile_image_url, claim_count, claimed_at, updated_at, profile_public, goals_public, theme_accent, open_to_opportunities, is_og, bio, link_x, link_github, link_site"
+        "handle, score, bonus_points, total_score, total_xp, social_proof, builder_proof, work_proof, analyzed_posts, last_refresh_at, archetype, tagline, analysis, darkroom_line, profile_image_url, claim_count, claimed_at, updated_at, profile_public, goals_public, theme_accent, open_to_opportunities, is_og, bio, link_x, link_github, link_site, github_username, github_verified"
       )
       .eq("handle", handle)
       .single(),
