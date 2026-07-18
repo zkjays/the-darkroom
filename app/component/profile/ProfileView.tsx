@@ -746,6 +746,9 @@ export function ProfileView({
               <div className="p-6 flex flex-col gap-3">
                 <div className="flex items-center gap-2">
                   <span className="font-[family-name:var(--font-mono)] text-[10px] px-2 py-0.5 rounded-sm border border-white/10 text-white/55">{selectedProof.proof_type}</span>
+                  {selectedProof.github_check_status === "owner_match" && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#00d4aa]/10 text-[#00d4aa] border border-[#00d4aa]/20">✓ GitHub Verified</span>
+                  )}
                   <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/30">
                     {new Date(selectedProof.completed_at ?? selectedProof.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>

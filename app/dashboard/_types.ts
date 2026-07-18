@@ -62,6 +62,9 @@ export interface WorkProof {
   original_goal_text?: string;
   original_description?: string;
   original_image_url?: string;
+  github_check_status?: string;
+  github_checked_at?: string;
+  github_repo_owner?: string;
 }
 
 export type XpResult = {

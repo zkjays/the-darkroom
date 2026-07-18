@@ -6,6 +6,7 @@ import { WORK_PROOF_POINTS, PROOF_CATEGORY_MAP, BUILDER_PROOF_TYPES, SOCIAL_PROO
 import type { WorkProof, XpResult } from "./_types";
 import { ProofGrid } from "../component/profile/ProofGrid";
 import { SubmitWorkModal } from "./SubmitWorkModal";
+import { parseGithubRepoUrl } from "../lib/github-url";
 
 const isSafeHttpUrl = (u?: string | null): u is string => !!u && /^https?:\/\//i.test(u);
 
@@ -35,6 +36,7 @@ export function WorkTab({
   const [editUploading, setEditUploading] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [rechecking, setRechecking] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/goals", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recalculate: true }) })
@@ -77,6 +79,24 @@ export function WorkTab({
     } else {
       setDeletingId(id);
       setTimeout(() => setDeletingId(null), 3000);
+    }
+  };
+
+  const recheckGithub = async (id: string) => {
+    setRechecking(id);
+    try {
+      const res = await fetch("/api/goals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ github_recheck: true, goal_id: id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setWorks((prev) => prev.map((w) => (w.id === id ? { ...w, ...data } : w)));
+        setSelectedWork((prev) => (prev && prev.id === id ? { ...prev, ...data } : prev));
+      }
+    } catch { /* ignore */ } finally {
+      setRechecking(null);
     }
   };
 
@@ -210,6 +230,12 @@ export function WorkTab({
                   {selectedWork.edited && (selectedWork.endorsement_count ?? 0) >= 3 && (
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">Edited</span>
                   )}
+                  {selectedWork.github_check_status === "owner_match" && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#00d4aa]/10 text-[#00d4aa] border border-[#00d4aa]/20">✓ GitHub Verified</span>
+                  )}
+                  {selectedWork.github_check_status === "no_match" && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.04] text-white/35 border border-white/10">GitHub: no match</span>
+                  )}
                   <span className="font-[family-name:var(--font-mono)] text-[10px] text-white/30">
                     {new Date(selectedWork.completed_at ?? selectedWork.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>
@@ -244,7 +270,16 @@ export function WorkTab({
                 <p className="font-[family-name:var(--font-mono)] text-xs text-white/30">
                   Worth {WORK_PROOF_POINTS[selectedWork.proof_type] ?? 3} pts · {endorsementCount >= 3 ? "Full value" : "Half value until validated"}
                 </p>
-                <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                <div className="flex items-center flex-wrap gap-2 pt-3 border-t border-white/5">
+                  {selectedWork.proof_value && PROOF_CATEGORY_MAP[selectedWork.proof_type] === "builder" && parseGithubRepoUrl(selectedWork.proof_value) && (
+                    <button
+                      onClick={() => recheckGithub(selectedWork.id)}
+                      disabled={rechecking === selectedWork.id}
+                      className="flex-1 flex items-center justify-center gap-1.5 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-wider py-2 rounded-sm border border-white/[0.12] text-white/60 hover:text-white hover:border-white/25 hover:bg-white/[0.04] transition-all disabled:opacity-40"
+                    >
+                      <span>↻</span> {rechecking === selectedWork.id ? "Checking…" : "Re-check"}
+                    </button>
+                  )}
                   <button
                     onClick={() => { const w = selectedWork; setSelectedWork(null); openEditModal(w); }}
                     className="flex-1 flex items-center justify-center gap-1.5 font-[family-name:var(--font-mono)] text-[11px] uppercase tracking-wider py-2 rounded-sm border border-white/[0.12] text-white/60 hover:text-white hover:border-white/25 hover:bg-white/[0.04] transition-all"
