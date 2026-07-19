@@ -319,6 +319,13 @@ export function ProfileView({
         {/* ── Action row (below band) ── */}
         <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/p/${handle}/score`}
+              className="font-[family-name:var(--font-mono)] text-[11px] tracking-widest uppercase border rounded-sm px-4 py-2 transition-all hover:opacity-80"
+              style={{ borderColor: "rgba(201,168,76,0.4)", color: "#c9a84c" }}
+            >
+              ◆ Score X-Ray →
+            </Link>
             <button
               onClick={onShareClick}
               className="font-[family-name:var(--font-mono)] text-[11px] tracking-widest uppercase text-slate-300 hover:text-white border border-white/10 hover:border-white/25 rounded-sm px-4 py-2 transition-all"
