@@ -4,7 +4,7 @@ import { authOptions } from "@/app/lib/auth-options";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { proofPoints } from "@/app/lib/room-score";
 
-const MIN_SAMPLE = 10; // same reliability gate as /api/score-benchmark
+const MIN_SAMPLE = 0; // temporarily lowered while the pool is small — same gate as /api/score-benchmark, raise back to 10 together
 const RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // No rank-history table exists (and we're not adding one — zero migration).

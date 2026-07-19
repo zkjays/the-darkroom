@@ -8,7 +8,7 @@ import { proofPoints } from "@/app/lib/room-score";
 // is a comparison feature, not a live leaderboard, so staleness is cheap here.
 export const revalidate = 3600;
 
-const MIN_SAMPLE = 10; // below this, a percentile is noise, not signal — hide it
+const MIN_SAMPLE = 0; // temporarily lowered while the pool is small — raise back to 10 once enough builders have joined
 
 type RankResult = { available: boolean; n: number; rank?: number; top_percent?: number; points?: number };
 
