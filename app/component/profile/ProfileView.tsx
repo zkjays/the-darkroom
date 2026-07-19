@@ -145,6 +145,7 @@ export function ProfileView({
         total_score: json.total_score,
         last_refresh_at: json.last_refresh_at,
         ...(json.analyzed_posts ? { analyzed_posts: json.analyzed_posts } : {}),
+        ...(json.profile_image_url ? { profile_image_url: json.profile_image_url } : {}),
       });
       setRefreshMsg(
         json.insufficient_original_posts
@@ -228,7 +229,7 @@ export function ProfileView({
 
             {/* LEFT — identity */}
             <div className="flex flex-col items-center text-center gap-2 flex-shrink-0 md:w-[160px]">
-              <ProfileImage url={data.profile_image_url} handle={handle} size={76} />
+              <ProfileImage url={effective.profile_image_url} handle={handle} size={76} />
               <div className="flex flex-col items-center">
                 <h1 className="text-lg font-medium text-white tracking-tight leading-tight">@{handle}</h1>
                 <p className="font-[family-name:var(--font-mono)] text-[11px] text-slate-500">{data.archetype}</p>
