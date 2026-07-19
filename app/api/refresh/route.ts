@@ -79,13 +79,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "AI scoring not configured" }, { status: 503 });
   }
 
-  // Step 3: Resolve X userId from handle
+  // Step 3: Resolve X userId from handle (also picks up a fresh avatar — the stored
+  // profile_image_url otherwise never updates after the initial claim/re-analyze,
+  // so it goes stale and 404s the moment someone changes their X picture).
   let userId = "";
+  let profileImageUrl = "";
   const profileController = new AbortController();
   const profileTimeout = setTimeout(() => profileController.abort(), 10000);
   try {
     const profileRes = await fetch(
-      `https://api.x.com/2/users/by/username/${encodeURIComponent(handle)}?user.fields=id`,
+      `https://api.x.com/2/users/by/username/${encodeURIComponent(handle)}?user.fields=id,profile_image_url`,
       {
         headers: { Authorization: `Bearer ${bearerToken}` },
         next: { revalidate: 0 },
@@ -100,6 +103,7 @@ export async function POST(req: NextRequest) {
     }
     const profileData = await profileRes.json();
     userId = profileData.data?.id ?? "";
+    profileImageUrl = (profileData.data?.profile_image_url ?? "").replace("_normal", "_400x400");
   } catch (e) {
     clearTimeout(profileTimeout);
     const reason = e instanceof Error && e.name === "AbortError" ? "X profile request timed out" : "X API request failed";
@@ -277,6 +281,9 @@ Return ONLY:
   if (!insufficientOriginalPosts) {
     updatePayload.analyzed_posts = analyzedPosts;
   }
+  if (profileImageUrl) {
+    updatePayload.profile_image_url = profileImageUrl;
+  }
 
   const { error: updateError } = await db
     .from("darkroom_ids")
@@ -297,5 +304,6 @@ Return ONLY:
     next_refresh_at: nextRefreshAt,
     insufficient_original_posts: insufficientOriginalPosts,
     ...(insufficientOriginalPosts ? {} : { analyzed_posts: analyzedPosts }),
+    ...(profileImageUrl ? { profile_image_url: profileImageUrl } : {}),
   });
 }

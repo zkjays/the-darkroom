@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/app/lib/supabase";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth-options";
+import { calcWorkProof, recalcAndPersistScore } from "@/app/lib/room-score";
 
 // GET /api/endorsements?goal_id=X
 export async function GET(req: NextRequest) {
@@ -112,45 +113,10 @@ export async function POST(req: NextRequest) {
       .eq("id", goal_id);
 
     if (endorseCount === 1 || endorseCount === 3) {
-      const PROOF_POINTS: Record<string, number> = {
-        Project: 8, OSS: 8, Article: 5, Video: 5, Design: 5, Thread: 3, Other: 3,
-      };
+      const newWorkProof = await calcWorkProof(db, goal.handle);
+      const persisted = await recalcAndPersistScore(db, goal.handle, newWorkProof);
 
-      const { data: allProofs } = await db
-        .from("daily_goals")
-        .select("proof_type, endorsement_count")
-        .eq("handle", goal.handle)
-        .eq("status", "completed")
-        .not("proof_value", "is", null);
-
-      const totalPoints = (allProofs ?? []).reduce((sum, p) => {
-        const base = PROOF_POINTS[p.proof_type] ?? 3;
-        const count = p.endorsement_count ?? 0;
-        const multiplier = count >= 3 ? 1.5 : count >= 1 ? 1.0 : 0.5;
-        return sum + Math.round(base * multiplier);
-      }, 0);
-
-      const newWorkProof = Math.min(100, Math.round((totalPoints / 50) * 100));
-
-      const { data: idRow } = await db
-        .from("darkroom_ids")
-        .select("social_proof, builder_proof, bonus_points")
-        .eq("handle", goal.handle)
-        .single();
-
-      if (idRow) {
-        const newRoomScore = Math.round(
-          (idRow.social_proof ?? 0) * 0.35 +
-          (idRow.builder_proof ?? 0) * 0.35 +
-          newWorkProof * 0.30
-        );
-        const newTotalScore = Math.min(100, newRoomScore + (idRow.bonus_points ?? 0));
-
-        await db
-          .from("darkroom_ids")
-          .update({ work_proof: newWorkProof, score: newRoomScore, total_score: newTotalScore })
-          .eq("handle", goal.handle);
-
+      if (persisted) {
         try {
           await db.from("xp_earnings").insert({
             handle: goal.handle,
